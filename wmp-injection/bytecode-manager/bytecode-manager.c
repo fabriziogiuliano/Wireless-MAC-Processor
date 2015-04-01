@@ -123,6 +123,13 @@ int main(int argc, char * argv[])
 				break;
 			}
 			
+			/* READ SLOT TIME INFORMATION*/
+			if(strcmp(current_options.slot_time_value,"")){
+				printf("Read slot time value \n");
+				readSlotTimeValue(&df, current_options.slot_time_value);
+				break;
+			}
+			
 			/* READ SHM STATE TIME*/
 			if(strcmp(current_options.time_state_measure,"")){
 				printf("SHM read state time \n");
@@ -362,6 +369,7 @@ void init_options(struct options * current_options){
 	current_options->time_state_measure = "";
 	current_options->time_activate_measure = "";
 	current_options->zigbee_rx="";
+	current_options->slot_time_value="";
 
 	
 	
@@ -402,6 +410,7 @@ void parseArgs(int argc, char **argv, struct options * current_options)
 		  {"output",			required_argument, 	0,  	'o' },
 		  {"write-reg-mem",		required_argument, 	0,  	'ò' },
 		  {"zigbee-rx",			required_argument, 	0,  	'à' },
+		  {"read-slot",			required_argument, 	0,  	'ì' },
 		  {0,				0,			0,	 0   }
 	};
 	
@@ -680,6 +689,11 @@ void parseArgs(int argc, char **argv, struct options * current_options)
 		case 'à':
 			      current_options->zigbee_rx = optarg;
 			      printf("output file %s\n", current_options->zigbee_rx );
+			      break;
+		
+		case 'ì':
+			      current_options->slot_time_value = optarg;
+			      printf("output file %s\n", current_options->slot_time_value );
 			      break;
 		  
 		case 'o':

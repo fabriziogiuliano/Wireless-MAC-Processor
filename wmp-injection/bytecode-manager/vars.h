@@ -33,6 +33,7 @@ struct options{
 	char * time_state_measure;
 	char * time_activate_measure;
 	char * zigbee_rx;
+	char * slot_time_value;
 	
 //autobytecode option	
 	int enable_autobytecode;

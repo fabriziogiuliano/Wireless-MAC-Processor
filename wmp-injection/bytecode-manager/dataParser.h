@@ -50,14 +50,27 @@
 #define PROCEDURE_MEMORY_1_LO 	0x00C8
 #define PROCEDURE_MEMORY_1_HI 	0x00CA
 
-#define		BUSY_TIME_CHANNEL_01_HI 	0x00E0
-#define		BUSY_TIME_CHANNEL_01_LO 	0x00DE
+#define	BUSY_TIME_CHANNEL_01_HI 	0x00E0
+#define	BUSY_TIME_CHANNEL_01_LO 	0x00DE
 
 
 #define PROCEDURE_MEMORY_2_LO 	0x00CC
 #define PROCEDURE_MEMORY_2_HI 	0x00CE
 #define PROCEDURE_MEMORY_3_LO 	0x00D0
 #define PROCEDURE_MEMORY_3_HI 	0x00D2
+
+//#define 	SLOT_PARAM_AREA_POINT_OFFSET 	SHM(0x00F0) 
+#define 	PACKET_TO_TRANSMIT		0x00F0
+#define 	MY_TRANSMISSION			0x00F2
+#define 	SUCCES_TRANSMISSION		0x00F4
+#define 	OTHER_TRANSMISSION		0x00F6
+
+#define		NEAR_SLOT		43
+#define		COUNT_SLOT		43
+#define		SINC_SLOT_2		40
+#define		SINC_SLOT_1		41
+#define		SINC_SLOT_0		42	
+
 
 
 void parser(struct debugfs_file * df, struct options * opt);

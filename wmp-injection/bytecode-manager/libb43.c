@@ -2,11 +2,14 @@
 #include <string.h>
 #include <sys/types.h>
 #include <stdlib.h>
+#include <time.h>
 #include <unistd.h>
 #include <errno.h>
 #include <dirent.h>
 #include "libb43.h"
 #include "hex2int.h"
+#include "dataParser.h"
+#include "vars.h"
 #include <time.h>       /* time_t, struct tm, time, localtime, strftime */
 
 
@@ -567,6 +570,131 @@ void shmReadZigbeeRx(struct debugfs_file * df,  char * file_name){
 	printf("\n");
 
 }
+
+/* ******************
+ * FUNCTION TO READ metaMAC parameters
+ * 
+ * work: the function runs for 120 seconds and every second change the bytecode slot protocol
+ * needed : you need load bytecode protocol in both WMP slots
+ * usage: to work this function you need run bytecode-manager with option --read-slot file_name
+ * example : ./bytecode-manager --read-slot log_slot.csv
+ * 
+ * ***************** */
+
+void readSlotTimeValue(struct debugfs_file * df,  char * file_name){
+  
+  	int i,j,k,l;
+	unsigned int count_slot;
+	unsigned int count_slot_old;
+	unsigned int count_slot_var;
+	unsigned int packet_to_transmit;
+	unsigned int my_transmission;
+	unsigned int succes_transmission;
+	unsigned int other_transmission;
+	
+	long int usec;
+	long int usec_from_start;
+	long int usec_from_current;
+	
+	struct timeval starttime, finishtime;
+	struct timeval start7slot, finish7slot;
+	
+	struct options opt;
+	
+	printf("name file %s\n",file_name);
+
+	FILE * log_slot_time;
+	log_slot_time = fopen(file_name, "w+");
+	fprintf(log_slot_time, "num-row,num-read,um-from-start-real,um-from-start-compute,um-diff-time,bytecode-protocol,count-slot,count-slot-var,packet_to_transmit,my_transmission,succes_transmission,other_transmission,\n");
+	gettimeofday(&starttime, NULL);
+	usec_from_current = 0;
+	start7slot= starttime;
+	k=0;
+	
+	for(l=0; l<120; l++){		//it runs for 120 seconds
+	  
+		if( (l%2) == 0)		//every second change bytecode slote
+		  opt.active = "1";
+		else
+		  opt.active = "2";
+		
+		//activation
+		writeAddressBytecode(df,&opt);		//change bytecode slot - generally we need from 20ms to 80ms to do it
+		count_slot_old = 0x000F & shmRead16(df, B43_SHM_REGS, COUNT_SLOT); //get current time slot number
+
+		
+		for(j=0; j<84; j++){ //we read metaMAC parameters every 12ms, so we complete 84 cycle in a second 
+		
+			//this code read metaMAC parameters
+		  
+			//delay
+			usleep(7000);
+		  
+			//read meta-MAC value, generally we need 5ms to do it
+			count_slot_old = count_slot & 0x000F;
+			count_slot = shmRead16(df, B43_SHM_REGS, COUNT_SLOT);
+			packet_to_transmit = shmRead16(df, B43_SHM_SHARED, PACKET_TO_TRANSMIT);
+			my_transmission = shmRead16(df, B43_SHM_SHARED, MY_TRANSMISSION);
+			succes_transmission = shmRead16(df, B43_SHM_SHARED, SUCCES_TRANSMISSION);
+			other_transmission = shmRead16(df, B43_SHM_SHARED, OTHER_TRANSMISSION);
+			
+			//compute cycle time
+			gettimeofday(&finish7slot, NULL);	    
+			usec=(finish7slot.tv_sec-start7slot.tv_sec)*1000000;
+			usec+=(finish7slot.tv_usec-start7slot.tv_usec);
+			usec_from_start = (finish7slot.tv_sec-starttime.tv_sec)*1000000;
+			usec_from_start += (finish7slot.tv_usec-starttime.tv_usec);
+			start7slot = finish7slot;
+			
+			// print debug values
+			printf("%d - %ld\n", j, usec);
+			printf("count_slot:0x%04X - packet_to_transmit:0x%04X - my_transmission:0x%04X - succes_transmission:0x%04X - other_transmission:0x%04X\n", count_slot, packet_to_transmit, my_transmission, succes_transmission, other_transmission);
+			
+			// check if cycle time is over, we must be sure to read at least every 16ms
+			if ( count_slot_old == (count_slot & 0x000F) | usec > 16000 | j==0)
+			{
+				// if last cicle is over 16ms or if we change bytecode, we fill time sloc with 0, no information for this slot time
+				printf("read error\n");
+				while(1){
+					fprintf(log_slot_time,"%d,%d,%ld,%ld,%ld,%c,%d,0,0,0,0,0\n",
+						k, j, usec_from_start, usec_from_current, usec, *opt.active, count_slot & 0x000F);	
+					k++;
+					usec_from_current += 2200;		
+					if(usec_from_current > usec_from_start )
+					    break;
+				}    
+				fflush(log_slot_time);
+			}
+			else
+			{
+				// we extract metaMAC parametes from registers and put it in the log file
+				count_slot_var = count_slot_old;
+				for(i=0; i<7; i++) // we get a maximum of 7 time slots, to safe, we not get the current 
+				{
+					fprintf(log_slot_time,"%d,%d,%ld,%ld,%ld,%c,%d,%d,%01x,%01x,%01x,%01x\n",
+						k, j, usec_from_start, usec_from_current, usec, *opt.active, count_slot & 0x000F, count_slot_var, 
+						(packet_to_transmit>>count_slot_var) & 0x0001, (my_transmission>>count_slot_var) & 0x0001, 
+						(succes_transmission>>count_slot_var) & 0x0001, (other_transmission>>count_slot_var) & 0x0001);	
+					k++;
+					usec_from_current += 2200;
+					if(count_slot_var==7) // we increase module 7
+					    count_slot_var=0;
+					else
+					    count_slot_var++;
+					
+					if(count_slot_var == (count_slot & 0x000F) ) //we read to the last slot time
+					    break;
+				}    
+				fflush(log_slot_time);	      
+			}
+		}
+	}
+	
+	fclose(log_slot_time);
+	printf("read successful\n");
+
+}
+
 
 
 
