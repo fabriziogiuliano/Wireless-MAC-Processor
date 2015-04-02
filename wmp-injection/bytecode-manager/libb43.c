@@ -583,7 +583,7 @@ void shmReadZigbeeRx(struct debugfs_file * df,  char * file_name){
 
 void readSlotTimeValue(struct debugfs_file * df,  char * file_name){
   
-  	int i,j,k,l;
+ 	int i,j,k,l;
 	unsigned int count_slot;
 	unsigned int count_slot_old;
 	unsigned int count_slot_var;
@@ -611,19 +611,28 @@ void readSlotTimeValue(struct debugfs_file * df,  char * file_name){
 	start7slot= starttime;
 	k=0;
 	
-	for(l=0; l<120; l++){		//it runs for 120 seconds
+	for(l=0; l<120; l++){ 		//it runs for 120 seconds
 	  
-		if( (l%2) == 0)		//every second change bytecode slote
+		
+		if( (l%2) == 0) 	//for this experiment every second change bytecode slot
 		  opt.active = "1";
 		else
 		  opt.active = "2";
 		
-		//activation
-		writeAddressBytecode(df,&opt);		//change bytecode slot - generally we need from 20ms to 80ms to do it
-		count_slot_old = 0x000F & shmRead16(df, B43_SHM_REGS, COUNT_SLOT); //get current time slot number
-
 		
-		for(j=0; j<84; j++){ //we read metaMAC parameters every 12ms, so we complete 84 cycle in a second 
+	//	gettimeofday(&start7slot, NULL);	
+		//activation
+		writeAddressBytecode(df,&opt);	//change bytecode slot - generally we need from 20ms to 80ms to do it
+	/*
+		gettimeofday(&finish7slot, NULL);	    
+		usec=(finish7slot.tv_sec-start7slot.tv_sec)*1000000;
+		usec+=(finish7slot.tv_usec-start7slot.tv_usec);
+		printf("%d - %ld\n", j, usec);
+		sleep(1);
+	*/	
+	
+		count_slot_old = 0x000F & shmRead16(df, B43_SHM_REGS, COUNT_SLOT);	//get current time slot number
+		for(j=0; j<84; j++){//we read metaMAC parameters every 12ms, so we complete 84 cycle in a second 
 		
 			//this code read metaMAC parameters
 		  
@@ -649,12 +658,15 @@ void readSlotTimeValue(struct debugfs_file * df,  char * file_name){
 			// print debug values
 			printf("%d - %ld\n", j, usec);
 			printf("count_slot:0x%04X - packet_to_transmit:0x%04X - my_transmission:0x%04X - succes_transmission:0x%04X - other_transmission:0x%04X\n", count_slot, packet_to_transmit, my_transmission, succes_transmission, other_transmission);
-			
+			//printf("%d - %d - %s,%d,%d,%ld\n", i, count_change, buffer, 251, 0,usec);    
+			  
 			// check if cycle time is over, we must be sure to read at least every 16ms
 			if ( count_slot_old == (count_slot & 0x000F) | usec > 16000 | j==0)
 			{
 				// if last cicle is over 16ms or if we change bytecode, we fill time sloc with 0, no information for this slot time
 				printf("read error\n");
+				if(usec > 100000)
+				  exit(1);
 				while(1){
 					fprintf(log_slot_time,"%d,%d,%ld,%ld,%ld,%c,%d,0,0,0,0,0\n",
 						k, j, usec_from_start, usec_from_current, usec, *opt.active, count_slot & 0x000F);	
@@ -669,7 +681,7 @@ void readSlotTimeValue(struct debugfs_file * df,  char * file_name){
 			{
 				// we extract metaMAC parametes from registers and put it in the log file
 				count_slot_var = count_slot_old;
-				for(i=0; i<7; i++) // we get a maximum of 7 time slots, to safe, we not get the current 
+				for(i=0; i<7; i++)	// we get a maximum of 7 time slots, to safe, we not get the current 
 				{
 					fprintf(log_slot_time,"%d,%d,%ld,%ld,%ld,%c,%d,%d,%01x,%01x,%01x,%01x\n",
 						k, j, usec_from_start, usec_from_current, usec, *opt.active, count_slot & 0x000F, count_slot_var, 
@@ -677,7 +689,7 @@ void readSlotTimeValue(struct debugfs_file * df,  char * file_name){
 						(succes_transmission>>count_slot_var) & 0x0001, (other_transmission>>count_slot_var) & 0x0001);	
 					k++;
 					usec_from_current += 2200;
-					if(count_slot_var==7) // we increase module 7
+					if(count_slot_var==7)	// we increase module 7
 					    count_slot_var=0;
 					else
 					    count_slot_var++;
@@ -688,6 +700,7 @@ void readSlotTimeValue(struct debugfs_file * df,  char * file_name){
 				fflush(log_slot_time);	      
 			}
 		}
+		
 	}
 	
 	fclose(log_slot_time);
