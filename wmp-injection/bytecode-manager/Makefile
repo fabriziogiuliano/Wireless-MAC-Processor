@@ -30,3 +30,5 @@ bytecode-work.o: bytecode-work.c
 clean:
 	rm *.o bytecode-manager
 
+metamac: metamac.h metamac.c protocols.h protocols.c
+	gcc -std=gnu99 -lm -o metamac metamac.c protocols.c
