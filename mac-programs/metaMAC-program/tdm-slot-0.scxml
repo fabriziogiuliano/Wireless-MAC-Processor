@@ -1,14 +1,14 @@
-<!-- SMPARAMETERSPRM_14=0&PRM_7=0&PRM_13=0&PRM_6=0&PRM_12=0&PRM_5=ff%3Aff%3Aff%3Aff%3Aff%3Aff&PRM_11=0&PRM_4=ff%3Aff%3Aff%3Aff%3Aff%3Aff&PRM_10=2200&CW_MAX=1023&PRM_9=0&START_STATE=0&PRM_8=0&INFLATION_MUL=2&CW_MIN=31&PRM_17=0&PRM_16=0&PRM_15=0&PRM_1=TDM&DEFLATION_DIV=1&PRM_3=1&PRM_2=6&BYTECODE_CHANNEL=6&CW_CURR=31&DEFLATION_SUB=65535&INFLATION_SUM=1 -->
+<!-- SMPARAMETERSPRM_14=0&PRM_7=0&PRM_13=0&PRM_6=0&PRM_12=8&PRM_5=ff%3Aff%3Aff%3Aff%3Aff%3Aff&PRM_11=0&PRM_4=ff%3Aff%3Aff%3Aff%3Aff%3Aff&PRM_10=2200&CW_MAX=1023&PRM_9=0&START_STATE=0&PRM_8=0&INFLATION_MUL=2&CW_MIN=31&PRM_17=0&PRM_16=0&PRM_15=0&PRM_1=TDM&DEFLATION_DIV=1&PRM_3=1&PRM_2=6&BYTECODE_CHANNEL=6&CW_CURR=31&DEFLATION_SUB=65535&INFLATION_SUM=1 -->
 <wmp initial="IDLE" version="0.9" xmlns="http://www.w3.org/2005/07/scxml"><!--   node-size-and-position x=0 y=0 w=4940 h=2710  -->
  <state id="IDLE"><!--   node-size-and-position x=2450 y=1320 w=160 h=130  -->
   <transition action="8" action2="0" action2param="15" action2reg="15" actionparam="15" actionreg="0" cond="0" condflag="1" condparam="15" condreg="15" event="8" eventparam="15" eventreg="15" target="RX_HEADER"><!--   edge-path [RX_HEADER]  pointx=0 pointy=-155 offsetx=-18 offsety=33  --></transition>
-  <transition action="13" action2="0" action2param="15" action2reg="15" actionparam="0" actionreg="1" cond="0" condflag="1" condparam="15" condreg="15" event="13" eventparam="15" eventreg="15" target="WAIT_TIME_SLOT"><!--   edge-path [WAIT_TIME_SLOT]  x=2780 y=1630 pointx=0 pointy=-52 offsetx=-7 offsety=-6  --></transition>
+  <transition action="0" action2="0" action2param="15" action2reg="15" actionparam="15" actionreg="15" cond="0" condflag="1" condparam="15" condreg="15" event="13" eventparam="15" eventreg="15" target="WAIT_TIME_SLOT"><!--   edge-path [WAIT_TIME_SLOT]  x=2780 y=1630 pointx=0 pointy=-52 offsetx=-7 offsety=-6  --></transition>
  </state>
  <state id="RX_HEADER"><!--   node-size-and-position x=2260 y=1870 w=150 h=70  -->
   <transition action="0" action2="0" action2param="15" action2reg="15" actionparam="15" actionreg="0" cond="0" condflag="1" condparam="15" condreg="15" event="41" eventparam="15" eventreg="15" target="CHECK_IF_SCHEDULE_ACK"><!--   edge-path [CHECK_IF_SCHEDULE_ACK]  pointx=1 pointy=-129 offsetx=11 offsety=-4  --></transition>
  </state>
  <state id="WAIT_TIME_SLOT"><!--   node-size-and-position x=2910 y=1880 w=160 h=80  -->
-  <transition action="2" action2="0" action2param="15" action2reg="15" actionparam="0" actionreg="0" cond="0" condflag="1" condparam="15" condreg="15" event="26" eventparam="15" eventreg="15" target="TX"><!--   edge-path [TX]  pointx=0 pointy=0 offsetx=-96 offsety=-16  --></transition>
+  <transition action="2" action2="0" action2param="15" action2reg="15" actionparam="0" actionreg="0" cond="0" condflag="1" condparam="15" condreg="15" event="26" eventparam="1" eventreg="15" target="TX"><!--   edge-path [TX]  pointx=0 pointy=0 offsetx=-96 offsety=-16  --></transition>
   <transition action="8" action2="0" action2param="15" action2reg="15" actionparam="15" actionreg="0" cond="0" condflag="1" condparam="15" condreg="15" event="8" eventparam="15" eventreg="15" target="RX_HEADER"><!--   edge-path [RX_HEADER]  pointx=1 pointy=60 offsetx=16 offsety=0  --></transition>
  </state>
  <state id="RX"><!--   node-size-and-position x=1390 y=1520 w=160 h=80  -->

@@ -605,7 +605,7 @@ void readSlotTimeValue(struct debugfs_file * df,  char * file_name){
 
 	FILE * log_slot_time;
 	log_slot_time = fopen(file_name, "w+");
-	fprintf(log_slot_time, "num-row,num-read,um-from-start-real,um-from-start-compute,um-diff-time,bytecode-protocol,count-slot,count-slot-var,packet_to_transmit,my_transmission,succes_transmission,other_transmission,\n");
+	fprintf(log_slot_time, "num-row,num-read,um-from-start-real,um-from-start-compute,um-diff-time,bytecode-protocol,count-slot,count-slot-var,packet_to_transmit,my_transmission,succes_transmission,other_transmission\n");
 	gettimeofday(&starttime, NULL);
 	usec_from_current = 0;
 	start7slot= starttime;
@@ -623,8 +623,13 @@ void readSlotTimeValue(struct debugfs_file * df,  char * file_name){
 	//	gettimeofday(&start7slot, NULL);	
 		//activation
 		writeAddressBytecode(df,&opt);	//change bytecode slot - generally we need from 20ms to 80ms to do it
+<<<<<<< HEAD
+	
+	/*	gettimeofday(&finish7slot, NULL);	    
+=======
 	/*
 		gettimeofday(&finish7slot, NULL);	    
+>>>>>>> 2b8d01afa46bbf338569848813d9e474705cf2db
 		usec=(finish7slot.tv_sec-start7slot.tv_sec)*1000000;
 		usec+=(finish7slot.tv_usec-start7slot.tv_usec);
 		printf("%d - %ld\n", j, usec);
@@ -700,6 +705,10 @@ void readSlotTimeValue(struct debugfs_file * df,  char * file_name){
 				fflush(log_slot_time);	      
 			}
 		}
+<<<<<<< HEAD
+	
+=======
+>>>>>>> 2b8d01afa46bbf338569848813d9e474705cf2db
 		
 	}
 	
