@@ -1,3 +1,8 @@
+#ifndef DATA_PARSER_H
+#define DATA_PARSER_H
+
+#include "libb43.h"
+#include "vars.h"
 
 #define ADDRESS_CONDITION_PROCEDURE  0x770
 
@@ -93,5 +98,4 @@ void setDelay(struct debugfs_file * df, struct options * opt);
 void setDelayTimer(struct debugfs_file * df, struct options * opt);
 void resetControl(struct debugfs_file * df);
 
-
-
+#endif

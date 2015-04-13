@@ -1,3 +1,8 @@
+#ifndef LIBB43_H
+#define LIBB43_H
+
+#include <stdio.h>
+
 #define B43_SHM_UCODE   	0
 #define B43_SHM_SHARED 		1
 #define B43_SHM_REGS 		2
@@ -38,6 +43,7 @@ int read16(struct debugfs_file * df, int reg);
 void maskSet16(struct debugfs_file * df, int reg, int mask, int set);
 void write16(struct debugfs_file * df, int reg, int value);
 unsigned int shmRead16(struct debugfs_file * df, int routing, int offset);
+void shmMaskSet16(struct debugfs_file * df, int routing, int offset, int mask, int set);
 void shmRead16_char(struct debugfs_file * df, int routing, int offset, char * buffer);
 
 unsigned int shmRead32_int(struct debugfs_file * df, int routing, int offset);
@@ -55,4 +61,4 @@ void getGprs(struct debugfs_file * df);
 
 void __debugfs_find(char *);
 
-
+#endif

@@ -1,3 +1,6 @@
+#ifndef VARS_H
+#define VARS_H
+
 #define CACHE_PATH_FILE "cache/"
 
 struct options{
@@ -53,4 +56,4 @@ struct options{
 	unsigned int timer[4];
 };
 
-
+#endif
