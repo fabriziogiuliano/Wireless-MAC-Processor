@@ -36,6 +36,7 @@
 #include "dataParser.h"
 #include "messageHandler.h"
 #include "auto-bytecode.h"
+#include "bytecode-work.h"
 
 
 
@@ -79,6 +80,15 @@ int main(int argc, char * argv[])
 			
 			//init broadcom interface
 			init_file(&df); // da far fare solo se si è un modalità OFFLINE o Server
+			
+			
+			if (strcmp(current_options.change_param,""))
+			{
+			  printf("Change bytecode parameter\n");
+			  change_parameter(&df, &current_options);
+			  break;
+			}
+			
 			
 			if(strcmp(current_options.reset,"") ){
 				printf("Reset control register\n");
@@ -370,6 +380,7 @@ void init_options(struct options * current_options){
 	current_options->time_activate_measure = "";
 	current_options->zigbee_rx="";
 	current_options->slot_time_value="";
+	current_options->change_param="";
 
 	
 	
@@ -411,6 +422,7 @@ void parseArgs(int argc, char **argv, struct options * current_options)
 		  {"write-reg-mem",		required_argument, 	0,  	'ò' },
 		  {"zigbee-rx",			required_argument, 	0,  	'à' },
 		  {"read-slot",			required_argument, 	0,  	'ì' },
+		  {"modify-parameter",		required_argument, 	0,  	'k' },
 		  {0,				0,			0,	 0   }
 	};
 	
@@ -608,6 +620,10 @@ void parseArgs(int argc, char **argv, struct options * current_options)
 			current_options->other_option = "1";
 			break;
 		  
+		  case 'k':
+			current_options->change_param = optarg;
+			break;
+			
 // autobytecode-option
 		  case '1':
 			    current_options->enable_mac_address=1;
@@ -739,6 +755,15 @@ void parseArgs(int argc, char **argv, struct options * current_options)
 		}
 	}  
 
+	
+	if (strcmp(current_options->change_param,""))
+	{
+		if (!strcmp(current_options->active,""))
+		{
+			printf("modify-parameter option need bytecode slot\n");
+			exit(1);
+		}
+	}
 	
 	if (strcmp(current_options->HOST,""))
 		if (!strcmp(current_options->PORT,""))

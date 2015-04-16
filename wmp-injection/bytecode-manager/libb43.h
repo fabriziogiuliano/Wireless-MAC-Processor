@@ -19,9 +19,6 @@
 #define B43_MACCTL_PSM_JMP0	0x00000004
 #define B43_MACCTL_PSM_DEBUG	0x00002000
 
-
-
-
 struct debugfs_file{
 	FILE * f_mmio16read;
 	FILE * f_mmio16write;
@@ -45,8 +42,6 @@ void shmRead16_char(struct debugfs_file * df, int routing, int offset, char * bu
 
 unsigned int shmRead32_int(struct debugfs_file * df, int routing, int offset);
 
-
-
 void shmRead32(struct debugfs_file * df, int routing, int offset, char * buffer);
 //void shmSharedRead(struct debugfs_file * df);
 
@@ -56,12 +51,6 @@ void shmMaskSet32(struct debugfs_file * df, int routing, int offset, int mask, i
 void shmSharedRead(struct debugfs_file * df);
 void getGprs(struct debugfs_file * df);
 
-void shmReadStateTime(struct debugfs_file * df,  char * file_name);
-void shmReadActivateTime(struct debugfs_file * df,  char * file_name);
-
-/* NOT IMPLEMENTED YET*/
-void getRaw(struct debugfs_file * df);
-void getPc(struct debugfs_file * df);
 
 
 void __debugfs_find(char *);
