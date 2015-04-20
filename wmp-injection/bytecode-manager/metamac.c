@@ -139,7 +139,7 @@ void metamac_loop(struct debugfs_file * df, struct protocol_suite *suite)
 
 		// This is where the active protocol will be updated once that is implemented
 
-		printf("Slot %d: ", slot_num);
+		printf("Slot %ld: ", slot_num);
 		for (int i = 0; i < suite->num_protocols; ++i) {
 			printf("%s=%f ", suite->protocols[i].name, suite->weights[i]);
 		}

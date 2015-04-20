@@ -31,4 +31,4 @@ clean:
 	- rm *.o bytecode-manager metamac
 
 metamac: metamac.h metamac.c protocols.h protocols.c libb43.h libb43.c dataParser.h dataParser.c hex2int.h hex2int.c
-	gcc -std=gnu99 -lm -o metamac metamac.c protocols.c libb43.c dataParser.c hex2int.c
+	gcc -std=gnu99 -o metamac metamac.c protocols.c libb43.c dataParser.c hex2int.c -lm
