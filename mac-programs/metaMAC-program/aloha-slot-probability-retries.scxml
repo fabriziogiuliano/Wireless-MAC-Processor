@@ -8,9 +8,9 @@
   <transition action="0" action2="0" action2param="15" action2reg="15" actionparam="15" actionreg="0" cond="0" condflag="1" condparam="15" condreg="15" event="41" eventparam="15" eventreg="15" target="CHECK_IF_SCHEDULE_ACK"><!--   edge-path [CHECK_IF_SCHEDULE_ACK]  pointx=1 pointy=-129 offsetx=11 offsety=-4  --></transition>
  </state>
  <state id="WAIT_TIME_SLOT"><!--   node-size-and-position x=2910 y=1880 w=160 h=80  -->
-  <transition action="2" action2="0" action2param="15" action2reg="0" actionparam="0" actionreg="1" cond="4" condflag="true" condparam="5" condreg="0" event="26" eventparam="0" eventreg="15" target="TX"><!--   edge-path [TX]  pointx=0 pointy=0 offsetx=-96 offsety=-16  --></transition>
+  <transition action="2" action2="0" action2param="15" action2reg="0" actionparam="0" actionreg="1" cond="4" condflag="false" condparam="5" condreg="0" event="26" eventparam="0" eventreg="15" target="TX"><!--   edge-path [TX]  pointx=0 pointy=0 offsetx=-96 offsety=-16  --></transition>
   <transition action="8" action2="0" action2param="15" action2reg="15" actionparam="15" actionreg="0" cond="0" condflag="1" condparam="15" condreg="15" event="8" eventparam="15" eventreg="15" target="RX_HEADER"><!--   edge-path [RX_HEADER]  pointx=1 pointy=60 offsetx=16 offsety=0  --></transition>
-  <transition action="0" action2="0" action2param="15" action2reg="0" actionparam="15" actionreg="15" cond="4" condflag="false" condparam="5" condreg="0" event="26" eventparam="0" eventreg="15" target="new_node40"><!--   edge-path [new_node40]  x=3430 y=1920 pointx=0 pointy=-2 offsetx=-55 offsety=3  --></transition>
+  <transition action="0" action2="0" action2param="15" action2reg="0" actionparam="15" actionreg="15" cond="4" condflag="true" condparam="5" condreg="0" event="26" eventparam="0" eventreg="15" target="new_node40"><!--   edge-path [new_node40]  x=3430 y=1920 pointx=0 pointy=-2 offsetx=-55 offsety=3  --></transition>
  </state>
  <state id="RX"><!--   node-size-and-position x=1390 y=1520 w=160 h=80  -->
   <transition action="0" action2="0" action2param="15" action2reg="15" actionparam="15" actionreg="15" cond="16" condflag="true" condparam="1" condreg="15" event="9" eventparam="15" eventreg="15" target="TX_ACK"><!--   edge-path [TX_ACK]  pointx=-1 pointy=324 offsetx=3 offsety=-9  --></transition>
