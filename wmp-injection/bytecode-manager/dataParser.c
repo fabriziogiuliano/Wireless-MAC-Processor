@@ -8,6 +8,7 @@
 #include "vars.h"
 #include "libb43.h"
 #include "bytecode-manager.h"
+#include "bytecode-work.h"
 #include "dataParser.h"
 
 
