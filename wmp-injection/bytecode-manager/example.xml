@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<metamac eta="0.25" initial-protocol="1">
+	<protocol id="1" name="Aloha(p=0.25)">
+		<fsm path="aloha-slotted-probability.txt"></fsm>
+		<emulator type="aloha">
+			<param key="persistence" value="0.25"/>
+		</emulator>
+	</protocol>
+	<protocol id="2" name="Aloha(p=0.50)">
+		<fsm path="aloha-slotted-probability.txt"></fsm>
+		<emulator type="aloha">
+			<param key="persistence" value="0.50"/>
+		</emulator>
+	</protocol>
+	<protocol id="3" name="Aloha(p=0.75)">
+		<fsm path="aloha-slotted-probability.txt"></fsm>
+		<emulator type="aloha">
+			<param key="persistence" value="0.75"/>
+		</emulator>
+	</protocol>
+</metamac>

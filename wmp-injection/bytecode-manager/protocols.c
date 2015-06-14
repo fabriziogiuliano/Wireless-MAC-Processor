@@ -23,6 +23,6 @@ double aloha_emulate(void *param, int slot_num, struct meta_slot previous_slot)
 		return 1.0;
 	} else {
 		/* Transmit with a probability of the persistance parameter. */
-		return ((struct aloha_param*)param)->persistance;
+		return ((struct aloha_param*)param)->persistence;
 	}
 }

@@ -2,7 +2,7 @@
 OBJECTS = bytecode-manager.o libb43.o hex2int.o dataParser.o messageHandler.o auto-bytecode.o bytecode-work.o
 
 # CFLAGS are the flags to use when *compiling*
-CFLAGS= -m32 
+CFLAGS=
 # LFLAGS are the flags to use when *linking*
 #LFLAGS=-ldl
 
@@ -30,5 +30,17 @@ bytecode-work.o: bytecode-work.c
 clean:
 	- rm *.o bytecode-manager metamac
 
-metamac: metamac.h metamac.c protocols.h protocols.c libb43.h libb43.c dataParser.h dataParser.c hex2int.h hex2int.c
-	gcc -std=gnu99 -o metamac metamac.c protocols.c libb43.c dataParser.c hex2int.c -lm
+MMCFLAGS=-std=gnu99 -Wall -g $(shell pkg-config libxml-2.0 --cflags)
+MMLFLAGS=-lm $(shell pkg-config libxml-2.0 --libs)
+MMOBJECTS=metamac.o protocols.o parseconfig.o metamac-manager.o libb43.o hex2int.o dataParser.o
+
+metamac.o: libb43.h metamac.h metamac.c
+	$(CC) $(MMCFLAGS) -c metamac.c
+protocols.o: metamac.h protocols.h protocols.c
+	$(CC) $(MMCFLAGS) -c protocols.c
+parseconfig.o: metamac.h parseconfig.h parseconfig.c
+	$(CC) $(MMCFLAGS) -c parseconfig.c
+metamac-manager.o: metamac.h parseconfig.h metamac-manager.c
+	$(CC) $(MMCFLAGS) -c metamac-manager.c
+metamac: $(MMOBJECTS)
+	$(CC) $(MMLFLAGS) -o metamac $(MMOBJECTS)
