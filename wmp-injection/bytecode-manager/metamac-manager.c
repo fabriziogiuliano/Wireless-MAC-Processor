@@ -2,49 +2,91 @@
 #include "parseconfig.h"
 
 #include <stdio.h>
+#include <argp.h>
+#include <signal.h>
+#include <string.h>
+
 #include <libxml/tree.h>
 #include <libxml/parser.h>
 
-int main(int argc, char *argv[])
+// ARG PARSING
+const char *argp_program_version = "MetaMAC Host Daemon 0.0.1";
+static char doc[] = "Switches MAC protocols in response to network activity.";
+static char args_doc[] = "CONFIG";
+
+static struct argp_option options[] = {
+	{ "verbose", 'v', 0, 0, "Verbose output." },
+	{ 0 }
+};
+
+struct arguments {
+	char *config;
+	int verbose:1;
+};
+
+static error_t parse_opt(int key, char *arg, struct argp_state *state)
 {
-	LIBXML_TEST_VERSION
-	xmlInitParser();
+	struct arguments *arguments = state->input;
 
-	if (argc != 2) {
-		fprintf(stderr, "Usage: %s CONFIG\n", argv[0]);
-		return -1;
+	switch (key) {
+	case 'v':
+		arguments->verbose = arg;
+		break;
+
+	case ARGP_KEY_ARG:
+		if (state->arg_num >= 1)
+			argp_usage(state);
+		
+		switch (state->arg_num) {
+		case 0:
+			arguments->config = arg;
+			break;
+		default:
+			break;
+		}
+
+		break;
+	case ARGP_KEY_END:
+		if (state->arg_num < 1)
+			argp_usage(state);
+		break;
+	default:
+		return ARGP_ERR_UNKNOWN;
 	}
-
-	struct protocol_suite *suite = read_config("metamac", argv[1]);
 
 	return 0;
 }
 
-/*int main(int argc, char *argv[])
+static struct argp argp = { options, parse_opt, args_doc, doc };
+
+static void inthandler(int signum, siginfo_t *info, void *ptr)
 {
-	struct protocol_suite suite;
-	init_protocol_suite(&suite, 3, 0.25);
+	if (signum == SIGINT) {
+		printf("Received SIGINT, exiting...");
+		metamac_loop_break = SIGINT;
+	}
+}
 
-	suite.protocols[0].emulator = aloha_emulate;
-	struct aloha_param aloha_parameter0;
-	aloha_parameter0.persistance = 0.25;
-	suite.protocols[0].parameter = &aloha_parameter0;
-	suite.protocols[0].name = "Aloha (.25)";
+static struct sigaction act;
 
-	suite.protocols[1].emulator = aloha_emulate;
-	struct aloha_param aloha_parameter1;
-	aloha_parameter1.persistance = 0.50;
-	suite.protocols[1].parameter = &aloha_parameter1;
-	suite.protocols[1].name = "Aloha (.50)";
+int main(int argc, char *argv[])
+{
+	/* Set signal handler for interrupt signal. */
+	act.sa_sigaction = inthandler;
+	act.sa_flags = SA_SIGINFO;
+	sigaction(SIGINT, &act, NULL);
 
-	suite.protocols[2].emulator = aloha_emulate;
-	struct aloha_param aloha_parameter2;
-	aloha_parameter2.persistance = 0.75;
-	suite.protocols[2].parameter = &aloha_parameter2;
-	suite.protocols[2].name = "Aloha (.75)";
+	struct arguments arguments;
+	memset(&arguments, 0, sizeof(arguments));
+	argp_parse(&argp, argc, argv, 0, 0, &arguments);
+
+	struct protocol_suite *suite = read_config(argv[0], arguments.config);
 
 	struct debugfs_file df;
 	init_file(&df);
+	metamac_init(&df, suite);
 
-	metamac_loop(&df, &suite);
-}*/
+	metamac_loop(&df, suite);
+
+	return 0;
+}
