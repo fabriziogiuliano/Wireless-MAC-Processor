@@ -1,7 +1,7 @@
 #include <math.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <time.h>
+#include <sys/time.h>
 #include <unistd.h>
 #include <err.h>
 
@@ -55,8 +55,8 @@ void init_protocol_suite(struct protocol_suite *suite, int num_protocols, double
 {
 	suite->num_protocols = num_protocols;
 	suite->best_protocol = -1;
-	suite->slot1_protocol = -1;
-	suite->slot2_protocol = -1;
+	suite->slot1_proto = -1;
+	suite->slot2_proto = -1;
 	suite->active_slot = 0;
 
 	suite->protocols = (struct protocol*)calloc(num_protocols, sizeof(struct protocol));
@@ -92,7 +92,7 @@ void free_protocol_suite(struct protocol_suite *suite)
 	free(suite);
 }
 
-void metamac_init(struct debugfs_file * df, struct protocol_suite *suite)
+void metamac_init(struct debugfs_file * df, struct protocol_suite *suite, metamac_flag_t flags)
 {
 	if (suite->num_protocols < 1) {
 		return;
@@ -114,21 +114,28 @@ void metamac_init(struct debugfs_file * df, struct protocol_suite *suite)
 		suite->best_protocol = p;
 	}
 
-	struct options opt;
-	opt.load = "1";
-	opt.name_file = suite->protocols[suite->best_protocol].fsm_path;
-	bytecodeSharedWrite(df, &opt);
+	if (flags & FLAG_READONLY) {
+		suite->slot1_proto = -1;
+		suite->slot2_proto = -1;
+	} else {
+		struct options opt;
+		opt.load = "1";
+		opt.name_file = suite->protocols[suite->best_protocol].fsm_path;
+		bytecodeSharedWrite(df, &opt);
 
-	suite->slot1_protocol = suite->best_protocol;
-	suite->active_slot = 1;
+		suite->slot1_proto = suite->best_protocol;
+		suite->slot2_proto = -1;
+		suite->active_slot = 1;
+	}
 }
 
 int metamac_loop_break = 0;
 
-int metamac_loop(struct debugfs_file *df, struct protocol_suite *suite)
+int metamac_loop(struct debugfs_file *df, struct protocol_suite *suite, metamac_flag_t flags)
 {
 	/* Metamac read loop adapted from code developed by Domenico Garlisi.
 	See bytecode-work.c:readSlotTimeValue. */
+
 	int i,j,k;
 	unsigned int slot_count;
 	unsigned int prev_slot_count;
@@ -148,22 +155,30 @@ int metamac_loop(struct debugfs_file *df, struct protocol_suite *suite)
 	
 	struct options opt;
 	
-	char fname_template[] = "/tmp/metamac-log-XXXXXX";
-	char *fname = mktemp(fname_template);
-	if (fname == NULL || *fname == '\0') {
-		err(EXIT_FAILURE, "Unable to generate unique log name.");
+	FILE * log_slot_time;
+	if (flags & FLAG_LOGGING) {
+		char fname_template[] = "/tmp/metamac-log-XXXXXX";
+		char *fname = mktemp(fname_template);
+		if (fname == NULL || *fname == '\0') {
+			err(EXIT_FAILURE, "Unable to generate unique log name");
+		}
+
+		log_slot_time = fopen(fname, "w+");
+		if (log_slot_time == NULL) {
+			err(EXIT_FAILURE, "Unable to open log file");
+		}
+
+		fprintf(log_slot_time, "num-row,num-read,um-from-start-real,um-from-start-compute,um-diff-time,count-slot,count-slot-var,packet_queued,transmitted,transmit_success,transmit_other\n");
+		printf("Logging to %s\n", fname);
+	} else {
+		log_slot_time = NULL;
 	}
 
-	printf("Logging to %s\n", fname);
-	FILE * log_slot_time;
-	log_slot_time = fopen(fname, "w+");
-	fprintf(log_slot_time, "num-row,num-read,um-from-start-real,um-from-start-compute,um-diff-time,count-slot,count-slot-var,packet_queued,transmitted,transmit_success,transmit_other\n");
-	
 	gettimeofday(&starttime, NULL);
 	usec_from_current = 0;
 	start7slot= starttime;
 	k=0;
-	
+
 	metamac_loop_break = 0;
 	while (metamac_loop_break == 0) {
 	  
@@ -176,7 +191,7 @@ int metamac_loop(struct debugfs_file *df, struct protocol_suite *suite)
 
 			usleep(7000);
 		  
-			//read meta-MAC value, generally we need 5ms to do it
+			// Read meta-MAC value, generally we need 5ms to do it
 			prev_slot_count = slot_count & 0x000F;
 			slot_count = shmRead16(df, B43_SHM_REGS, COUNT_SLOT);
 			packet_queued = shmRead16(df, B43_SHM_SHARED, PACKET_TO_TRANSMIT);
@@ -185,7 +200,7 @@ int metamac_loop(struct debugfs_file *df, struct protocol_suite *suite)
 			transmit_other = shmRead16(df, B43_SHM_SHARED, OTHER_TRANSMISSION);
 			channel_busy = (transmitted & ~transmit_success) | transmit_other;
 			
-			//compute cycle time
+			// Compute cycle time
 			gettimeofday(&finish7slot, NULL);	    
 			usec = (finish7slot.tv_sec - start7slot.tv_sec) * 1000000;
 			usec += (finish7slot.tv_usec - start7slot.tv_usec);
@@ -194,26 +209,28 @@ int metamac_loop(struct debugfs_file *df, struct protocol_suite *suite)
 			start7slot = finish7slot;
 			
 			// print debug values
-			printf("%d - %ld\n", j, usec);
-			printf("slot_count:0x%04X - packet_queued:0x%04X - transmitted:0x%04X - transmit_success:0x%04X - transmit_other:0x%04X\n", slot_count, packet_queued, transmitted, transmit_success, transmit_other);
+			//printf("%d - %ld\n", j, usec);
+			//printf("slot_count:0x%04X - packet_queued:0x%04X - transmitted:0x%04X - transmit_success:0x%04X - transmit_other:0x%04X\n", slot_count, packet_queued, transmitted, transmit_success, transmit_other);
 			//printf("%d - %d - %s,%d,%d,%ld\n", i, count_change, buffer, 251, 0,usec);    
 			  
 			// check if cycle time is over, we must be sure to read at least every 16ms
 			if ((prev_slot_count == (slot_count & 0x000F)) | usec > 16000 | j == 0)
 			{
-				// if last cicle is over 16ms or if we change bytecode, we fill time sloc with 0, no information for this slot time
-				printf("read error\n");
+				// if last cycle is over 16ms or if we change bytecode, we fill time sloc with 0, no information for this slot time
+				//printf("read error\n");
 				if(usec > 100000)
 				  exit(1);
 				while(1){
-					fprintf(log_slot_time,"%d,%d,%ld,%ld,%ld,%d,0,0,0,0,0\n",
-						k, j, usec_from_start, usec_from_current, usec, slot_count & 0x000F);	
+					if (flags & FLAG_LOGGING) {
+						fprintf(log_slot_time,"%d,%d,%ld,%ld,%ld,%d,0,0,0,0,0\n",
+							k, j, usec_from_start, usec_from_current, usec, slot_count & 0x000F);
+					}
+
 					k++;
 					usec_from_current += 2200;		
 					if(usec_from_current > usec_from_start)
 					    break;
-				}    
-				fflush(log_slot_time);
+				}
 			}
 			else
 			{
@@ -221,29 +238,33 @@ int metamac_loop(struct debugfs_file *df, struct protocol_suite *suite)
 				slot_count_var = prev_slot_count;
 				for(i=0; i<7; i++)	// we get a maximum of 7 time slots, to safe, we not get the current 
 				{
-					fprintf(log_slot_time,"%d,%d,%ld,%ld,%ld,%d,%d,%01x,%01x,%01x,%01x\n",
-						k, j, usec_from_start, usec_from_current, usec, slot_count & 0x000F, slot_count_var, 
-						(packet_queued>>slot_count_var) & 0x0001, (transmitted>>slot_count_var) & 0x0001, 
-						(transmit_success>>slot_count_var) & 0x0001, (transmit_other>>slot_count_var) & 0x0001);	
+					if (flags && FLAG_LOGGING) {
+						fprintf(log_slot_time,"%d,%d,%ld,%ld,%ld,%d,%d,%01x,%01x,%01x,%01x\n",
+							k, j, usec_from_start, usec_from_current, usec, slot_count & 0x000F, slot_count_var,
+							(packet_queued>>slot_count_var) & 0x0001, (transmitted>>slot_count_var) & 0x0001,
+							(transmit_success>>slot_count_var) & 0x0001, (transmit_other>>slot_count_var) & 0x0001);
+					}
+
 					k++;
 					usec_from_current += 2200;
-					if(slot_count_var==7)	// we increase module 7
+					if(slot_count_var==7) {	// we increase module 7
 					    slot_count_var=0;
-					else
+					} else {
 					    slot_count_var++;
+					}
 					
-					if(slot_count_var == (slot_count & 0x000F) ) //we read to the last slot time
+					if(slot_count_var == (slot_count & 0x000F)) { //we read to the last slot time
 					    break;
-				}    
-				fflush(log_slot_time);	      
+					}
+				}
 			}
 		}
 	
-		
 	}
-	
-	fclose(log_slot_time);
-	printf("read successful\n");
+
+	if (flags & FLAG_LOGGING) {
+		fclose(log_slot_time);
+	}
 
 	return metamac_loop_break;
 }

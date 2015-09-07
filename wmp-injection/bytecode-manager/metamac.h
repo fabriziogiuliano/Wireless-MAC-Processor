@@ -4,6 +4,13 @@
 #include "libb43.h"
 
 typedef unsigned char uchar;
+typedef unsigned int uint;
+
+typedef enum {
+	FLAG_VERBOSE = 1,
+	FLAG_LOGGING = 2,
+	FLAG_READONLY = 4
+} metamac_flag_t;
 
 struct meta_slot {
 	int slot_num;
@@ -39,9 +46,9 @@ struct protocol_suite {
 	/* Index of best protocol. Initially null. */
 	int best_protocol;
 	/* Index of protocol in slot 1. Null if no protocol in slot 1. */
-	int slot1_protocol;
+	int slot1_proto;
 	/* Index of protocol in slot 2. Null if no protocol in slot 2. */
-	int slot2_protocol;
+	int slot2_proto;
 	/* Which slot is active. 0 indicates neither are active. */
 	int active_slot;
 	/* Array of all protocols. */
@@ -58,8 +65,8 @@ void free_protocol(struct protocol *proto);
 void init_protocol_suite(struct protocol_suite *suite, int num_protocols, double eta);
 void free_protocol_suite(struct protocol_suite *suite);
 void update_weights(struct protocol_suite *suite, struct meta_slot slot);
-void metamac_init(struct debugfs_file * df, struct protocol_suite *suite);
-int metamac_loop(struct debugfs_file * df, struct protocol_suite *suite);
+void metamac_init(struct debugfs_file * df, struct protocol_suite *suite, metamac_flag_t flags);
+int metamac_loop(struct debugfs_file * df, struct protocol_suite *suite, metamac_flag_t flags);
 
 extern int metamac_loop_break;
 

@@ -16,12 +16,14 @@ static char args_doc[] = "CONFIG";
 
 static struct argp_option options[] = {
 	{ "verbose", 'v', 0, 0, "Verbose output." },
+	{ "logging", 'v', 0, 0, "Log MAC feedback for each slot." },
+	{ "readonly", 'r', 0, 0, "Do not update running protocol." },
 	{ 0 }
 };
 
 struct arguments {
 	char *config;
-	int verbose:1;
+	metamac_flag_t metamac_flags;
 };
 
 static error_t parse_opt(int key, char *arg, struct argp_state *state)
@@ -30,13 +32,21 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state)
 
 	switch (key) {
 	case 'v':
-		arguments->verbose = arg;
+		arguments->metamac_flags |= FLAG_VERBOSE;
+		break;
+
+	case 'l':
+		arguments->metamac_flags |= FLAG_LOGGING;
+		break;
+
+	case 'r':
+		arguments->metamac_flags |= FLAG_READONLY;
 		break;
 
 	case ARGP_KEY_ARG:
 		if (state->arg_num >= 1)
 			argp_usage(state);
-		
+
 		switch (state->arg_num) {
 		case 0:
 			arguments->config = arg;
@@ -84,9 +94,9 @@ int main(int argc, char *argv[])
 
 	struct debugfs_file df;
 	init_file(&df);
-	metamac_init(&df, suite);
+	metamac_init(&df, suite, arguments.metamac_flags);
 
-	metamac_loop(&df, suite);
+	metamac_loop(&df, suite, arguments.metamac_flags);
 
 	return 0;
 }
