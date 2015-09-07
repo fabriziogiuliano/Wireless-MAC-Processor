@@ -12,7 +12,7 @@ typedef enum {
 	FLAG_READONLY = 4
 } metamac_flag_t;
 
-struct meta_slot {
+struct metamac_slot {
 	int slot_num;
 	/* 1 represents that there was a packet waiting to be transmitted,
 	0 represents that there was no packet waiting to be transmitted. */
@@ -25,7 +25,7 @@ struct meta_slot {
 	uchar channel_busy : 1;
 };
 
-typedef double (*protocol_emulator)(void *param, int slot_num, struct meta_slot previous_slot);
+typedef double (*protocol_emulator)(void *param, int slot_num, struct metamac_slot previous_slot);
 
 struct protocol {
 	/* Unique identifier. */
@@ -43,12 +43,10 @@ struct protocol {
 struct protocol_suite {
 	/* Total number of protocols. */
 	int num_protocols;
-	/* Index of best protocol. Initially null. */
-	int best_protocol;
-	/* Index of protocol in slot 1. Null if no protocol in slot 1. */
-	int slot1_proto;
-	/* Index of protocol in slot 2. Null if no protocol in slot 2. */
-	int slot2_proto;
+	/* Index of best protocol. Initially -1. */
+	int active_protocol;
+	/* Index of protocols in slots. -1 Indicated invalid */
+	int slots[2];
 	/* Which slot is active. 0 indicates neither are active. */
 	int active_slot;
 	/* Array of all protocols. */
@@ -58,13 +56,13 @@ struct protocol_suite {
 	/* Factor used in computing weights. */
 	double eta;
 	/* Slot information for last to be emulated. */
-	struct meta_slot last_slot;
+	struct metamac_slot last_slot;
 };
 
 void free_protocol(struct protocol *proto);
 void init_protocol_suite(struct protocol_suite *suite, int num_protocols, double eta);
 void free_protocol_suite(struct protocol_suite *suite);
-void update_weights(struct protocol_suite *suite, struct meta_slot slot);
+void update_weights(struct protocol_suite *suite, struct metamac_slot slot);
 void metamac_init(struct debugfs_file * df, struct protocol_suite *suite, metamac_flag_t flags);
 int metamac_loop(struct debugfs_file * df, struct protocol_suite *suite, metamac_flag_t flags);
 

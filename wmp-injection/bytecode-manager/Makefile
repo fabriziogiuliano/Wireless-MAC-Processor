@@ -31,7 +31,7 @@ clean:
 	- rm *.o bytecode-manager metamac
 
 MMCFLAGS=-std=gnu99 -Wall -g $(shell pkg-config libxml-2.0 --cflags)
-MMLFLAGS=-lm -lxml2
+MMLFLAGS=-lm $(shell pkg-config libxml-2.0 --libs)
 MMOBJECTS=metamac.o protocols.o parseconfig.o metamac-manager.o libb43.o hex2int.o dataParser.o bytecode-work.o
 
 metamac.o: libb43.h metamac.h metamac.c
@@ -43,4 +43,4 @@ parseconfig.o: metamac.h parseconfig.h parseconfig.c
 metamac-manager.o: metamac.h parseconfig.h metamac-manager.c
 	$(CC) $(MMCFLAGS) -c metamac-manager.c
 metamac: $(MMOBJECTS)
-	$(CC) $(MMLFLAGS) -o metamac $(MMOBJECTS)
+	$(CC) -o metamac $(MMOBJECTS) $(MMLFLAGS)

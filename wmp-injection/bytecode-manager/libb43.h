@@ -51,6 +51,7 @@ unsigned int shmRead32_int(struct debugfs_file * df, int routing, int offset);
 void shmRead32(struct debugfs_file * df, int routing, int offset, char * buffer);
 //void shmSharedRead(struct debugfs_file * df);
 
+void shmWrite16(struct debugfs_file * df, int routing, int offset, int value);
 void shmWrite32(struct debugfs_file * df, int routing, int offset, int value);
 void shmMaskSet32(struct debugfs_file * df, int routing, int offset, int mask, int set);
 

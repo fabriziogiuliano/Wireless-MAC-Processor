@@ -7,14 +7,14 @@
 	param->slot_assignment = slot_assignment;
 }*/
 
-double tdma_emulate(void *param, int slot_num, struct meta_slot previous_slot)
+double tdma_emulate(void *param, int slot_num, struct metamac_slot previous_slot)
 {
 	struct tdma_param *tdma_params = (struct tdma_param*)param;
 	return ((slot_num - tdma_params->frame_offset) % tdma_params->frame_length) ==
 		tdma_params->slot_assignment ? 1.0 : 0.0;
 }
 
-double aloha_emulate(void *param, int slot_num, struct meta_slot previous_slot)
+double aloha_emulate(void *param, int slot_num, struct metamac_slot previous_slot)
 {
 	/* Determine if this is the first slot that this packet has been queued
 	to transmit. */

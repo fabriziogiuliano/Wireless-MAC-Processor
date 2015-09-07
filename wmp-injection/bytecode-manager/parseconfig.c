@@ -300,7 +300,7 @@ struct protocol_suite *read_config(char *program_name, char *file_name)
 
 	for (index = 0; index < num_protocols; index++) {
 		if (suite->protocols[index].id == initial) {
-			suite->best_protocol = index;
+			suite->active_protocol = index;
 		}
 	}
 	

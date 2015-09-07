@@ -21,7 +21,7 @@ void free_protocol(struct protocol *proto)
 
 /* Performs the computation for emulating the suite of protocols
 for a single slot, and adjusting the weights. */
-void update_weights(struct protocol_suite* suite, struct meta_slot current_slot)
+void update_weights(struct protocol_suite* suite, struct metamac_slot current_slot)
 {
 	/* If there is no packet queued for this slot, consider all protocols to be correct
 	and thus the weights will not change. */
@@ -54,10 +54,10 @@ void update_weights(struct protocol_suite* suite, struct meta_slot current_slot)
 void init_protocol_suite(struct protocol_suite *suite, int num_protocols, double eta)
 {
 	suite->num_protocols = num_protocols;
-	suite->best_protocol = -1;
-	suite->slot1_proto = -1;
-	suite->slot2_proto = -1;
-	suite->active_slot = 0;
+	suite->active_protocol = -1;
+	suite->slots[0] = -1;
+	suite->slots[1] = -1;
+	suite->active_slot = -1;
 
 	suite->protocols = (struct protocol*)calloc(num_protocols, sizeof(struct protocol));
 	if (suite->protocols == NULL) {
@@ -82,8 +82,7 @@ void init_protocol_suite(struct protocol_suite *suite, int num_protocols, double
 
 void free_protocol_suite(struct protocol_suite *suite)
 {
-	int i;
-	for (i = 0; i < suite->num_protocols; i++) {
+	for (int i = 0; i < suite->num_protocols; i++) {
 		free_protocol(&suite->protocols[i]);
 	}
 
@@ -99,7 +98,7 @@ void metamac_init(struct debugfs_file * df, struct protocol_suite *suite, metama
 	}
 
 	/* Best protocol could be already initialized based on predictions/heuristics */
-	if (suite->best_protocol < 0) {
+	if (suite->active_protocol < 0) {
 		/* Select the best protocol based on weights. At this point, they
 		should be the same, so the first protocol will be selected. */
 		int p = 0;
@@ -111,21 +110,83 @@ void metamac_init(struct debugfs_file * df, struct protocol_suite *suite, metama
 			}
 		}
 
-		suite->best_protocol = p;
+		suite->active_protocol = p;
 	}
 
 	if (flags & FLAG_READONLY) {
-		suite->slot1_proto = -1;
-		suite->slot2_proto = -1;
+		suite->slots[0] = -1;
+		suite->slots[1] = -1;
 	} else {
 		struct options opt;
 		opt.load = "1";
-		opt.name_file = suite->protocols[suite->best_protocol].fsm_path;
+		opt.name_file = suite->protocols[suite->active_protocol].fsm_path;
 		bytecodeSharedWrite(df, &opt);
 
-		suite->slot1_proto = suite->best_protocol;
-		suite->slot2_proto = -1;
-		suite->active_slot = 1;
+		suite->slots[0] = suite->active_protocol;
+		suite->slots[1] = -1;
+		suite->active_slot = 0;
+	}
+}
+
+static void metamac_display(unsigned long loop, struct protocol_suite *suite)
+{
+	if (loop > 0) {
+		/* Reset cursor upwards by the number of protocols we will be printing. */
+		printf("\x1b[%dF", suite->num_protocols);
+	}
+
+	int i;
+	for (i = 0; i < suite->num_protocols; i++) {
+		printf("%c %5.3f %s\n",
+			suite->active_protocol == i ? '*' : ' ',
+			suite->weights[i],
+			suite->protocols[i].name);
+	}
+}
+
+static void metamac_switch(struct debugfs_file *df, struct protocol_suite *suite)
+{
+	/* Identify the best and second-best protocols. */
+	int best = 0, second = 0;
+	for (int i = 0; i < suite->num_protocols; i++) {
+		if (suite->weights[i] > suite->weights[best]) {
+			second = best;
+			best = i;
+		}
+	}
+
+	if (best != suite->active_protocol) {
+		/* Protocol switch necessitated. */
+		struct options opt;
+
+		if (best == suite->slots[0]) {
+			opt.active = "1";
+			writeAddressBytecode(df, &opt);
+			suite->active_slot = 0;
+
+		} else if (best == suite->slots[1]) {
+			opt.active = "2";
+			writeAddressBytecode(df, &opt);
+			suite->active_slot = 1;
+
+		} else if (second == suite->slots[0]) {
+			/* If second best protocol is already in slot 1, then load
+			best into slot 2. */
+			opt.load = "2";
+			opt.name_file = suite->protocols[best].fsm_path;
+			bytecodeSharedWrite(df, &opt);
+			suite->slots[1] = best;
+			suite->active_slot = 1;
+
+		} else {
+			opt.load = "1";
+			opt.name_file = suite->protocols[best].fsm_path;
+			bytecodeSharedWrite(df, &opt);
+			suite->slots[0] = best;
+			suite->active_slot = 0;
+		}
+
+		suite->active_protocol = best;
 	}
 }
 
@@ -145,6 +206,8 @@ int metamac_loop(struct debugfs_file *df, struct protocol_suite *suite, metamac_
 	unsigned int transmit_success;
 	unsigned int transmit_other;
 	unsigned int channel_busy;
+	unsigned long slot_num = 0;
+	unsigned long loop = 0;
 	
 	long int usec;
 	long int usec_from_start;
@@ -152,8 +215,6 @@ int metamac_loop(struct debugfs_file *df, struct protocol_suite *suite, metamac_
 	
 	struct timeval starttime, finishtime;
 	struct timeval start7slot, finish7slot;
-	
-	struct options opt;
 	
 	FILE * log_slot_time;
 	if (flags & FLAG_LOGGING) {
@@ -186,7 +247,7 @@ int metamac_loop(struct debugfs_file *df, struct protocol_suite *suite, metamac_
 		/*writeAddressBytecode(df,&opt);*/
 	
 		prev_slot_count = 0x000F & shmRead16(df, B43_SHM_REGS, COUNT_SLOT);	//get current time slot number
-		for(j = 0; j < 84; j++){
+		for (j = 0; j < 84; j++) {
 			/* Read slot results every 12ms, completing 84 cycles each second. */
 
 			usleep(7000);
@@ -214,22 +275,32 @@ int metamac_loop(struct debugfs_file *df, struct protocol_suite *suite, metamac_
 			//printf("%d - %d - %s,%d,%d,%ld\n", i, count_change, buffer, 251, 0,usec);    
 			  
 			// check if cycle time is over, we must be sure to read at least every 16ms
-			if ((prev_slot_count == (slot_count & 0x000F)) | usec > 16000 | j == 0)
+			if ((prev_slot_count == (slot_count & 0x000F)) || usec > 16000 || j == 0)
 			{
 				// if last cycle is over 16ms or if we change bytecode, we fill time sloc with 0, no information for this slot time
 				//printf("read error\n");
-				if(usec > 100000)
-				  exit(1);
+				if(usec > 100000) {
+					exit(1);
+				}
+
 				while(1){
-					if (flags & FLAG_LOGGING) {
+					struct metamac_slot slot_data = {
+						.slot_num = slot_num++,
+						.packet_queued = 0,
+						.transmitted = 0,
+						.channel_busy = 0
+					};
+
+					if (log_slot_time != NULL) {
 						fprintf(log_slot_time,"%d,%d,%ld,%ld,%ld,%d,0,0,0,0,0\n",
 							k, j, usec_from_start, usec_from_current, usec, slot_count & 0x000F);
 					}
 
 					k++;
 					usec_from_current += 2200;		
-					if(usec_from_current > usec_from_start)
+					if (usec_from_current > usec_from_start) {
 					    break;
+					}
 				}
 			}
 			else
@@ -238,7 +309,14 @@ int metamac_loop(struct debugfs_file *df, struct protocol_suite *suite, metamac_
 				slot_count_var = prev_slot_count;
 				for(i=0; i<7; i++)	// we get a maximum of 7 time slots, to safe, we not get the current 
 				{
-					if (flags && FLAG_LOGGING) {
+					struct metamac_slot slot_data = {
+						.slot_num = slot_num++,
+						.packet_queued = (packet_queued >> slot_count_var) & 1,
+						.transmitted = (transmitted >> slot_count_var) & 1,
+						.channel_busy = (channel_busy >> slot_count_var) & 1
+					};
+					
+					if (log_slot_time != NULL) {
 						fprintf(log_slot_time,"%d,%d,%ld,%ld,%ld,%d,%d,%01x,%01x,%01x,%01x\n",
 							k, j, usec_from_start, usec_from_current, usec, slot_count & 0x000F, slot_count_var,
 							(packet_queued>>slot_count_var) & 0x0001, (transmitted>>slot_count_var) & 0x0001,
@@ -247,22 +325,27 @@ int metamac_loop(struct debugfs_file *df, struct protocol_suite *suite, metamac_
 
 					k++;
 					usec_from_current += 2200;
-					if(slot_count_var==7) {	// we increase module 7
-					    slot_count_var=0;
-					} else {
-					    slot_count_var++;
-					}
-					
+					slot_count_var = (slot_count_var + 1) % 8;
+
 					if(slot_count_var == (slot_count & 0x000F)) { //we read to the last slot time
 					    break;
 					}
 				}
 			}
 		}
-	
+
+		if (!(flags & FLAG_READONLY)) {
+			metamac_switch(df, suite);
+		}
+
+		if (flags & FLAG_VERBOSE) {
+			metamac_display(loop, suite);
+		}
+		
+		loop++;
 	}
 
-	if (flags & FLAG_LOGGING) {
+	if (log_slot_time != NULL) {
 		fclose(log_slot_time);
 	}
 
@@ -296,7 +379,7 @@ int metamac_loop(struct debugfs_file *df, struct protocol_suite *suite, metamac_
 
 			unsigned int slot = prev_slot_count;
 			for (int j = 0; j < 7; ++j) {
-				struct meta_slot slot_data;
+				struct metamac_slot slot_data;
 				slot_data.slot_num = slot_num++;
 				slot_data.packet_queued = (packet_queued >> slot) & 1;
 				slot_data.transmitted = (transmitted >> slot) & 1;

@@ -2,7 +2,7 @@
 #include <string.h>
 #include <sys/types.h>
 #include <stdlib.h>
-#include <time.h>
+#include <sys/time.h>
 #include <unistd.h>
 #include <errno.h>
 #include <dirent.h>
