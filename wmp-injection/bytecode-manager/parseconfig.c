@@ -17,9 +17,31 @@ char *dup_and_free(xmlChar *s)
 		return NULL;
 	}
 
-	int len = strlen((char*)s);
-	char *t = (char*)malloc(len + 1);
+	size_t len = strlen((char*)s);
+	char *t = malloc(len + 1);
 	memcpy(t, s, len + 1);
+	xmlFree(s);
+	return t;
+}
+
+char *concat_and_free(const char *base, xmlChar *s)
+{
+	if (base == NULL) {
+		return dup_and_free(s);
+	}
+
+	size_t baselen = strlen(base);
+	size_t slen = strlen((char*)s);
+	/* +2 for null terminator and possible / separator. */
+	char *t = malloc(baselen + slen + 2);
+	
+	memcpy(t, base, baselen);
+	char *start = t + baselen;
+	if (baselen > 0 && t[baselen-1] != '/') {
+		*start++ = '/';
+	}
+
+	memcpy(start, s, slen + 1);
 	xmlFree(s);
 	return t;
 }
@@ -189,7 +211,7 @@ struct tdma_param *read_tdma_params(xmlNode *emulator_node)
 	return param;
 }
 
-void read_protocol(struct protocol *proto, xmlNode *protocol_node)
+void read_protocol(struct protocol *proto, xmlNode *protocol_node, const char *fsm_basepath)
 {
 	/* Parse id */
 	char *id_str = (char*)xmlGetProp(protocol_node, (xmlChar*)"id");
@@ -211,7 +233,7 @@ void read_protocol(struct protocol *proto, xmlNode *protocol_node)
 		errx(EXIT_FAILURE, "Invalid configuration file: %s.\n", "Missing \"fsm\" child of <protocol> node");
 	}
 
-	proto->fsm_path = dup_and_free(xmlGetProp(fsm_node, (xmlChar*)"path"));
+	proto->fsm_path = concat_and_free(fsm_basepath, xmlGetProp(fsm_node, (xmlChar*)"path"));
 	if (!proto->fsm_path) {
 		errx(EXIT_FAILURE, "Invalid configuration file: %s.\n", "Missing \"path\" attribute on <fsm> node");
 	}
@@ -239,7 +261,8 @@ void read_protocol(struct protocol *proto, xmlNode *protocol_node)
 	xmlFree(type);
 }
 
-struct protocol_suite *read_config(char *program_name, char *file_name)
+struct protocol_suite *read_config(const char *program_name,
+	const char *file_name, const char *fsm_basepath)
 {
 	xmlDoc *doc = xmlParseFile(file_name);
 	if (!doc) {
@@ -294,7 +317,7 @@ struct protocol_suite *read_config(char *program_name, char *file_name)
 			continue;
 		}
 
-		read_protocol(&suite->protocols[index++], protocol_node);
+		read_protocol(&suite->protocols[index++], protocol_node, fsm_basepath);
 		protocol_node = protocol_node->next;
 	}
 

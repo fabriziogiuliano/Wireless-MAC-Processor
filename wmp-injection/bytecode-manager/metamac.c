@@ -192,12 +192,12 @@ static void metamac_switch(struct debugfs_file *df, struct protocol_suite *suite
 
 int metamac_loop_break = 0;
 
-int metamac_loop(struct debugfs_file *df, struct protocol_suite *suite, metamac_flag_t flags)
+int metamac_read_loop(struct metamac_queue *queue, struct debugfs_file *df, metamac_flag_t flags)
 {
 	/* Metamac read loop adapted from code developed by Domenico Garlisi.
 	See bytecode-work.c:readSlotTimeValue. */
 
-	int i,j,k;
+	unsigned long int i,j,k;
 	unsigned int slot_count;
 	unsigned int prev_slot_count;
 	unsigned int slot_count_var;
@@ -207,7 +207,6 @@ int metamac_loop(struct debugfs_file *df, struct protocol_suite *suite, metamac_
 	unsigned int transmit_other;
 	unsigned int channel_busy;
 	unsigned long slot_num = 0;
-	unsigned long loop = 0;
 	
 	long int usec;
 	long int usec_from_start;
@@ -215,191 +214,183 @@ int metamac_loop(struct debugfs_file *df, struct protocol_suite *suite, metamac_
 	
 	struct timeval starttime, finishtime;
 	struct timeval start7slot, finish7slot;
-	
-	FILE * log_slot_time;
-	if (flags & FLAG_LOGGING) {
-		char fname_template[] = "/tmp/metamac-log-XXXXXX";
-		char *fname = mktemp(fname_template);
-		if (fname == NULL || *fname == '\0') {
-			err(EXIT_FAILURE, "Unable to generate unique log name");
-		}
 
-		log_slot_time = fopen(fname, "w+");
-		if (log_slot_time == NULL) {
-			err(EXIT_FAILURE, "Unable to open log file");
-		}
-
-		fprintf(log_slot_time, "num-row,num-read,um-from-start-real,um-from-start-compute,um-diff-time,count-slot,count-slot-var,packet_queued,transmitted,transmit_success,transmit_other\n");
-		printf("Logging to %s\n", fname);
-	} else {
-		log_slot_time = NULL;
-	}
+	struct metamac_slot slots[16];
+	int slot_index = 0;
 
 	gettimeofday(&starttime, NULL);
 	usec_from_current = 0;
 	start7slot= starttime;
 	k=0;
 
+	prev_slot_count = 0x000F & shmRead16(df, B43_SHM_REGS, COUNT_SLOT);	//get current time slot number
 	metamac_loop_break = 0;
-	while (metamac_loop_break == 0) {
-	  
-		/* Changing the active bytecode takes between 20 and 80 ms. */
-		/*writeAddressBytecode(df,&opt);*/
-	
-		prev_slot_count = 0x000F & shmRead16(df, B43_SHM_REGS, COUNT_SLOT);	//get current time slot number
-		for (j = 0; j < 84; j++) {
-			/* Read slot results every 12ms, completing 84 cycles each second. */
 
-			usleep(7000);
-		  
-			// Read meta-MAC value, generally we need 5ms to do it
-			prev_slot_count = slot_count & 0x000F;
-			slot_count = shmRead16(df, B43_SHM_REGS, COUNT_SLOT);
-			packet_queued = shmRead16(df, B43_SHM_SHARED, PACKET_TO_TRANSMIT);
-			transmitted = shmRead16(df, B43_SHM_SHARED, MY_TRANSMISSION);
-			transmit_success = shmRead16(df, B43_SHM_SHARED, SUCCES_TRANSMISSION);
-			transmit_other = shmRead16(df, B43_SHM_SHARED, OTHER_TRANSMISSION);
-			channel_busy = (transmitted & ~transmit_success) | transmit_other;
-			
-			// Compute cycle time
-			gettimeofday(&finish7slot, NULL);	    
-			usec = (finish7slot.tv_sec - start7slot.tv_sec) * 1000000;
-			usec += (finish7slot.tv_usec - start7slot.tv_usec);
-			usec_from_start = (finish7slot.tv_sec - starttime.tv_sec) * 1000000;
-			usec_from_start += (finish7slot.tv_usec - starttime.tv_usec);
-			start7slot = finish7slot;
-			
-			// print debug values
-			//printf("%d - %ld\n", j, usec);
-			//printf("slot_count:0x%04X - packet_queued:0x%04X - transmitted:0x%04X - transmit_success:0x%04X - transmit_other:0x%04X\n", slot_count, packet_queued, transmitted, transmit_success, transmit_other);
-			//printf("%d - %d - %s,%d,%d,%ld\n", i, count_change, buffer, 251, 0,usec);    
-			  
-			// check if cycle time is over, we must be sure to read at least every 16ms
-			if ((prev_slot_count == (slot_count & 0x000F)) || usec > 16000 || j == 0)
-			{
-				// if last cycle is over 16ms or if we change bytecode, we fill time sloc with 0, no information for this slot time
-				//printf("read error\n");
-				if(usec > 100000) {
-					exit(1);
-				}
+	for (j = 0; metamac_loop_break == 0; j++) {
 
-				while(1){
-					struct metamac_slot slot_data = {
-						.slot_num = slot_num++,
-						.packet_queued = 0,
-						.transmitted = 0,
-						.channel_busy = 0
-					};
+		usleep(7000);
 
-					if (log_slot_time != NULL) {
-						fprintf(log_slot_time,"%d,%d,%ld,%ld,%ld,%d,0,0,0,0,0\n",
-							k, j, usec_from_start, usec_from_current, usec, slot_count & 0x000F);
-					}
-
-					k++;
-					usec_from_current += 2200;		
-					if (usec_from_current > usec_from_start) {
-					    break;
-					}
-				}
-			}
-			else
-			{
-				// we extract metaMAC parametes from registers and put it in the log file
-				slot_count_var = prev_slot_count;
-				for(i=0; i<7; i++)	// we get a maximum of 7 time slots, to safe, we not get the current 
-				{
-					struct metamac_slot slot_data = {
-						.slot_num = slot_num++,
-						.packet_queued = (packet_queued >> slot_count_var) & 1,
-						.transmitted = (transmitted >> slot_count_var) & 1,
-						.channel_busy = (channel_busy >> slot_count_var) & 1
-					};
-					
-					if (log_slot_time != NULL) {
-						fprintf(log_slot_time,"%d,%d,%ld,%ld,%ld,%d,%d,%01x,%01x,%01x,%01x\n",
-							k, j, usec_from_start, usec_from_current, usec, slot_count & 0x000F, slot_count_var,
-							(packet_queued>>slot_count_var) & 0x0001, (transmitted>>slot_count_var) & 0x0001,
-							(transmit_success>>slot_count_var) & 0x0001, (transmit_other>>slot_count_var) & 0x0001);
-					}
-
-					k++;
-					usec_from_current += 2200;
-					slot_count_var = (slot_count_var + 1) % 8;
-
-					if(slot_count_var == (slot_count & 0x000F)) { //we read to the last slot time
-					    break;
-					}
-				}
-			}
-		}
-
-		if (!(flags & FLAG_READONLY)) {
-			metamac_switch(df, suite);
-		}
-
-		if (flags & FLAG_VERBOSE) {
-			metamac_display(loop, suite);
-		}
+		// Read meta-MAC value, generally we need 5ms to do it
+		prev_slot_count = slot_count & 0x000F;
+		slot_count = shmRead16(df, B43_SHM_REGS, COUNT_SLOT);
+		packet_queued = shmRead16(df, B43_SHM_SHARED, PACKET_TO_TRANSMIT);
+		transmitted = shmRead16(df, B43_SHM_SHARED, MY_TRANSMISSION);
+		transmit_success = shmRead16(df, B43_SHM_SHARED, SUCCES_TRANSMISSION);
+		transmit_other = shmRead16(df, B43_SHM_SHARED, OTHER_TRANSMISSION);
+		channel_busy = (transmitted & ~transmit_success) | transmit_other;
 		
-		loop++;
-	}
+		// Compute cycle time
+		gettimeofday(&finish7slot, NULL);	    
+		usec = (finish7slot.tv_sec - start7slot.tv_sec) * 1000000;
+		usec += (finish7slot.tv_usec - start7slot.tv_usec);
+		usec_from_start = (finish7slot.tv_sec - starttime.tv_sec) * 1000000;
+		usec_from_start += (finish7slot.tv_usec - starttime.tv_usec);
+		start7slot = finish7slot;
+		
+		// print debug values
+		//printf("%d - %ld\n", j, usec);
+		//printf("slot_count:0x%04X - packet_queued:0x%04X - transmitted:0x%04X - transmit_success:0x%04X - transmit_other:0x%04X\n", slot_count, packet_queued, transmitted, transmit_success, transmit_other);
+		//printf("%d - %d - %s,%d,%d,%ld\n", i, count_change, buffer, 251, 0,usec);    
+		  
+		// check if cycle time is over, we must be sure to read at least every 16ms
+		if ((prev_slot_count == (slot_count & 0x000F)) || usec > 16000 || j == 0)
+		{
+			// if last cycle is over 16ms or if we change bytecode, we fill time sloc with 0, no information for this slot time
+			//printf("read error\n");
+			if(usec > 100000) {
+				exit(1);
+			}
 
-	if (log_slot_time != NULL) {
-		fclose(log_slot_time);
+			while (1) {
+				slots[slot_index].slot_num = slot_num++;
+				slots[slot_index].read_num = j;
+				slots[slot_index].read_usecs = usec_from_start;
+				slots[slot_index].slot_calc_usecs = usec_from_current;
+				slots[slot_index].usecs_diff = usec;
+				slots[slot_index].slot_count = slot_count & 0x000F;
+				slots[slot_index].slot_count_var = 0;
+				slots[slot_index].packet_queued = 0;
+				slots[slot_index].transmitted = 0;
+				slots[slot_index].channel_busy = 0;
+				slot_index++;
+
+				if (slot_index >= ARRAY_SIZE(slots)) {
+					queue_multipush(queue, slots, slot_index);
+					slot_index = 0;
+				}
+
+				k++;
+				usec_from_current += 2200;		
+				if (usec_from_current > usec_from_start) {
+				    break;
+				}
+			}
+		}
+		else
+		{
+			// we extract metaMAC parametes from registers and put it in the log file
+			slot_count_var = prev_slot_count;
+			for(i=0; i<7; i++)	// we get a maximum of 7 time slots, to safe, we not get the current 
+			{
+				slots[slot_index].slot_num = slot_num++;
+				slots[slot_index].read_num = j;
+				slots[slot_index].read_usecs = usec_from_start;
+				slots[slot_index].slot_calc_usecs = usec_from_current;
+				slots[slot_index].usecs_diff = usec;
+				slots[slot_index].slot_count = slot_count & 0x000F;
+				slots[slot_index].slot_count_var = slot_count_var;
+				slots[slot_index].packet_queued = (packet_queued >> slot_count_var) & 1;
+				slots[slot_index].transmitted = (transmitted >> slot_count_var) & 1;
+				slots[slot_index].channel_busy = (channel_busy >> slot_count_var) & 1;
+				slot_index++;
+
+				if (slot_index >= ARRAY_SIZE(slots)) {
+					queue_multipush(queue, slots, slot_index);
+					slot_index = 0;
+				}
+
+				k++;
+				usec_from_current += 2200;
+				slot_count_var = (slot_count_var + 1) % 8;
+
+				if(slot_count_var == (slot_count & 0x000F)) { //we read to the last slot time
+				    break;
+				}
+			}
+		}
 	}
 
 	return metamac_loop_break;
 }
 
-/*void metamac_loop(struct debugfs_file * df, struct protocol_suite *suite)
+int metamac_process_loop(struct metamac_queue *queue, struct debugfs_file *df,
+	struct protocol_suite *suite, metamac_flag_t flags, const char *logpath)
 {
-	//metamac_init(df, suite);
-
-	unsigned long slot_num = 0;
-
-	while (1) {
-		// Active protocol is only updated (if necessary) every 1 sec
-		unsigned int slot_count = shmRead16(df, B43_SHM_REGS, COUNT_SLOT);
-		unsigned int prev_slot_count;
-
-		for (int i = 0; i < 84; ++i) { // This loop takes up oone second
-			usleep(7000); // delay
-
-			prev_slot_count = slot_count & 0x0F;
-			slot_count = shmRead16(df, B43_SHM_REGS, COUNT_SLOT);
-			unsigned int packet_queued = shmRead16(df, B43_SHM_SHARED, PACKET_TO_TRANSMIT);
-			unsigned int transmitted  = shmRead16(df, B43_SHM_SHARED, MY_TRANSMISSION);
-			unsigned int transmit_success = shmRead16(df, B43_SHM_SHARED, SUCCES_TRANSMISSION);
-			unsigned int transmit_other =shmRead16(df, B43_SHM_SHARED, OTHER_TRANSMISSION);
-			unsigned int channel_busy = (transmitted & ~transmit_success) | transmit_other;
-
-			// Debugging.
-			printf("slot_count=%d\n", slot_count);
-
-			unsigned int slot = prev_slot_count;
-			for (int j = 0; j < 7; ++j) {
-				struct metamac_slot slot_data;
-				slot_data.slot_num = slot_num++;
-				slot_data.packet_queued = (packet_queued >> slot) & 1;
-				slot_data.transmitted = (transmitted >> slot) & 1;
-				slot_data.channel_busy = (channel_busy >> slot) & 1;
-
-				update_weights(suite, slot_data);
-
-				slot = (slot + 1) % 7;
-				if (slot == (slot_count & 0x0F)) {
-					break;
-				}
-			}
+	FILE * logfile;
+	if (flags & FLAG_LOGGING) {
+		logfile = fopen(logpath, "w+");
+		if (logfile == NULL) {
+			err(EXIT_FAILURE, "Unable to open log file");
 		}
 
-		// This is where the active protocol will be updated once that is implemented
-
-		printf("Slot %ld: ", slot_num);
-		for (int i = 0; i < suite->num_protocols; ++i) {
-			printf("%s=%f ", suite->protocols[i].name, suite->weights[i]);
-		}
-		printf("\n");
+		fprintf(logfile, "slot_num,read_num,read_usecs,slot_calc_usecs,usecs_diff,slot_count,slot_count_var,packet_queued,transmitted,channel_busy\n");
+		printf("Logging to %s\n", logpath);
+	} else {
+		logfile = NULL;
 	}
-}*/
+
+	unsigned long loop = 0;
+	struct timeval last_update_time;
+	gettimeofday(&last_update_time, NULL);
+
+	metamac_loop_break = 0;
+	while (metamac_loop_break == 0) {
+
+		struct metamac_slot slots[16];
+		size_t count = queue_multipop(queue, slots, ARRAY_SIZE(slots));
+
+		for (int i = 0; i < count; i++) {
+			if (logfile != NULL) {
+				fprintf(logfile, "%ld,%ld,%ld,%ld,%ld,%d,%d,%01x,%01x,%01x\n",
+					slots[i].slot_num,
+					slots[i].read_num,
+					slots[i].read_usecs,
+					slots[i].slot_calc_usecs,
+					slots[i].usecs_diff,
+					slots[i].slot_count,
+					slots[i].slot_count_var,
+					slots[i].packet_queued,
+					slots[i].transmitted,
+					slots[i].channel_busy);
+			}
+
+			update_weights(suite, slots[i]);
+
+		}
+
+		struct timeval current_time;
+		gettimeofday(&current_time, NULL);
+
+		unsigned long timediff = (current_time.tv_sec - last_update_time.tv_sec) * 1000000
+			+ (current_time.tv_usec - last_update_time.tv_usec);
+
+		/* Update running protocol and the console every 1 second. */
+		if (timediff > 1000000) {
+			if (!(flags & FLAG_READONLY)) {
+				metamac_switch(df, suite);
+			}
+
+			if (flags & FLAG_VERBOSE) {
+				metamac_display(loop++, suite);
+			}
+
+			last_update_time = current_time;
+		}
+	}
+
+	if (logfile != NULL) {
+		fclose(logfile);
+	}
+
+	return metamac_loop_break;
+}

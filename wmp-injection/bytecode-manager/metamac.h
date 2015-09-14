@@ -3,6 +3,8 @@
 
 #include "libb43.h"
 
+#include "queue.h"
+
 typedef unsigned char uchar;
 typedef unsigned int uint;
 
@@ -13,7 +15,16 @@ typedef enum {
 } metamac_flag_t;
 
 struct metamac_slot {
-	int slot_num;
+	unsigned long slot_num;
+	unsigned long read_num;
+
+	unsigned long read_usecs;
+	unsigned long slot_calc_usecs;
+	unsigned long usecs_diff;
+
+	unsigned int slot_count;
+	unsigned int slot_count_var;
+
 	/* 1 represents that there was a packet waiting to be transmitted,
 	0 represents that there was no packet waiting to be transmitted. */
 	uchar packet_queued : 1;
@@ -64,8 +75,14 @@ void init_protocol_suite(struct protocol_suite *suite, int num_protocols, double
 void free_protocol_suite(struct protocol_suite *suite);
 void update_weights(struct protocol_suite *suite, struct metamac_slot slot);
 void metamac_init(struct debugfs_file * df, struct protocol_suite *suite, metamac_flag_t flags);
-int metamac_loop(struct debugfs_file * df, struct protocol_suite *suite, metamac_flag_t flags);
+
+int metamac_read_loop(struct metamac_queue *queue, struct debugfs_file *df,
+	metamac_flag_t flags);
+int metamac_process_loop(struct metamac_queue *queue, struct debugfs_file *df,
+	struct protocol_suite *suite, metamac_flag_t flags, const char *logpath);
 
 extern int metamac_loop_break;
+
+#define ARRAY_SIZE(a) (sizeof(a) / sizeof(a[0]))
 
 #endif // METAMAC_H
