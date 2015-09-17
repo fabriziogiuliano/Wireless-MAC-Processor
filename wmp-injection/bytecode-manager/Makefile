@@ -2,14 +2,14 @@
 OBJECTS = bytecode-manager.o libb43.o hex2int.o dataParser.o messageHandler.o auto-bytecode.o bytecode-work.o
 
 # CFLAGS are the flags to use when *compiling*
-CFLAGS=
+CFLAGS= -m32
 # LFLAGS are the flags to use when *linking*
 #LFLAGS=-ldl
 
 
 #bytecode-manager: bytecode-manager.o
 bytecode-manager: $(OBJECTS)
-	$(CC) $(LDFLAGS) $(OBJECTS) -m32 -o bytecode-manager
+	$(CC) $(LDFLAGS) $(OBJECTS) $(CFLAGS) -o bytecode-manager
 
 bytecode-manager.o: bytecode-manager.c
 	$(CC) $(CFLAGS) -c bytecode-manager.c
@@ -35,14 +35,14 @@ MMLFLAGS=-lm $(shell pkg-config libxml-2.0 --libs) -pthread
 MMOBJECTS=metamac.o protocols.o parseconfig.o queue.o metamac-manager.o libb43.o hex2int.o dataParser.o bytecode-work.o
 
 metamac.o: libb43.h metamac.h metamac.c
-	$(CC) $(MMCFLAGS) -c metamac.c
+	$(CC) $(CFLAGS) $(MMCFLAGS) -c metamac.c
 protocols.o: metamac.h protocols.h protocols.c
-	$(CC) $(MMCFLAGS) -c protocols.c
+	$(CC) $(CFLAGS) $(MMCFLAGS) -c protocols.c
 parseconfig.o: metamac.h parseconfig.h parseconfig.c
-	$(CC) $(MMCFLAGS) -c parseconfig.c
+	$(CC) $(CFLAGS) $(MMCFLAGS) -c parseconfig.c
 queue.o: queue.h queue.c
-	$(CC) $(MMCFLAGS) -c queue.c
+	$(CC) $(CFLAGS) $(MMCFLAGS) -c queue.c
 metamac-manager.o: metamac.h parseconfig.h metamac-manager.c
-	$(CC) $(MMCFLAGS) -c metamac-manager.c
+	$(CC) $(CFLAGS) $(MMCFLAGS) -c metamac-manager.c
 metamac: $(MMOBJECTS)
-	$(CC) -o metamac $(MMOBJECTS) $(MMLFLAGS)
+	$(CC)  $(MMOBJECTS) $(MMLFLAGS)  $(CFLAGS) -o metamac
