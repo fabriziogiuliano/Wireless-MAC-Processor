@@ -269,8 +269,11 @@ int metamac_read_loop(struct metamac_queue *queue, struct debugfs_file *df, meta
 				slots[slot_index].usecs_diff = usec;
 				slots[slot_index].slot_count = slot_count & 0x000F;
 				slots[slot_index].slot_count_var = 0;
+				slots[slot_index].filler = 1;
 				slots[slot_index].packet_queued = 0;
 				slots[slot_index].transmitted = 0;
+				slots[slot_index].transmit_success = 0;
+				slots[slot_index].transmit_other = 0;
 				slots[slot_index].channel_busy = 0;
 				slot_index++;
 
@@ -299,8 +302,11 @@ int metamac_read_loop(struct metamac_queue *queue, struct debugfs_file *df, meta
 				slots[slot_index].usecs_diff = usec;
 				slots[slot_index].slot_count = slot_count & 0x000F;
 				slots[slot_index].slot_count_var = slot_count_var;
+				slots[slot_index].filler = 0;
 				slots[slot_index].packet_queued = (packet_queued >> slot_count_var) & 1;
 				slots[slot_index].transmitted = (transmitted >> slot_count_var) & 1;
+				slots[slot_index].transmit_success = (transmit_success >> slot_count_var) & 1;
+				slots[slot_index].transmit_other = (transmit_other >> slot_count_var) & 1;
 				slots[slot_index].channel_busy = (channel_busy >> slot_count_var) & 1;
 				slot_index++;
 
@@ -333,7 +339,7 @@ int metamac_process_loop(struct metamac_queue *queue, struct debugfs_file *df,
 			err(EXIT_FAILURE, "Unable to open log file");
 		}
 
-		fprintf(logfile, "slot_num,read_num,read_usecs,slot_calc_usecs,usecs_diff,slot_count,slot_count_var,packet_queued,transmitted,channel_busy\n");
+		fprintf(logfile, "slot_num,read_num,read_usecs,slot_calc_usecs,usecs_diff,slot_count,slot_count_var,filler,packet_queued,transmitted,transmit_success,transmit_other,channel_busy\n");
 		printf("Logging to %s\n", logpath);
 	} else {
 		logfile = NULL;
@@ -351,7 +357,7 @@ int metamac_process_loop(struct metamac_queue *queue, struct debugfs_file *df,
 
 		for (int i = 0; i < count; i++) {
 			if (logfile != NULL) {
-				fprintf(logfile, "%ld,%ld,%ld,%ld,%ld,%d,%d,%01x,%01x,%01x\n",
+				fprintf(logfile, "%ld,%ld,%ld,%ld,%ld,%d,%d,%01x,%01x,%01x,%01x,%01x,%01x\n",
 					slots[i].slot_num,
 					slots[i].read_num,
 					slots[i].read_usecs,
@@ -359,8 +365,11 @@ int metamac_process_loop(struct metamac_queue *queue, struct debugfs_file *df,
 					slots[i].usecs_diff,
 					slots[i].slot_count,
 					slots[i].slot_count_var,
+					slots[i].filler,
 					slots[i].packet_queued,
 					slots[i].transmitted,
+					slots[i].transmit_success,
+					slots[i].transmit_other,
 					slots[i].channel_busy);
 			}
 

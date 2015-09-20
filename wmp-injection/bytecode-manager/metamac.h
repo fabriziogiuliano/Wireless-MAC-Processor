@@ -25,14 +25,19 @@ struct metamac_slot {
 	unsigned int slot_count;
 	unsigned int slot_count_var;
 
-	/* 1 represents that there was a packet waiting to be transmitted,
-	0 represents that there was no packet waiting to be transmitted. */
+	/* Indicates if this slot was filled in because of a delay in
+	reading from the board. */
+	uchar filler : 1;
+	/* Indicates that a packet was waiting to be transmitted in this slot. */
 	uchar packet_queued : 1;
-	/* 1 represents that the running protocol transmitted a frame,
-	0 represents that no frame was transmitted. */
+	/* Indicates that a transmission was attempted in this slot. */
 	uchar transmitted : 1;
-	/* 1 represents that the channel was used by another node, 0
-	represents channel was not used by another node. */
+	/* Indicates that a transmission was successful in this slot. */
+	uchar transmit_success : 1;
+	/* Indicates that another node attempted a transmission in this slot. */
+	uchar transmit_other : 1;
+	/* Indicates that either a transmission attempt was unsuccessful
+	in this slot or another node attempted a transmission. */
 	uchar channel_busy : 1;
 };
 
