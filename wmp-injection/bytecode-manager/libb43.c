@@ -81,7 +81,7 @@ u_int16_t read16(struct debugfs_file * df, int reg){
 
 	/* """Do a 16bit MMIO read""" */
 	char buffer[256];
-	unsigned int u_int16_t=0;
+	u_int16_t ret = 0;
 	
 	rewind (df->f_mmio16read);
 	fprintf (df->f_mmio16read, "0x%X",reg);
