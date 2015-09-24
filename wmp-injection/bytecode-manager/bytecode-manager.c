@@ -125,6 +125,15 @@ int main(int argc, char * argv[])
 			}
 
 			
+			/* DUMP TSF */
+			if(!strcmp(current_options.reg_share,"4")){
+				uint64_t tsf;
+				getTSFRegs(&df, &tsf);
+				printf("TSF registers dump %f\n",(double)tsf);
+				break;
+			}
+
+			
 
 			/* READ SHM ZIGBEE RX*/
 			if(strcmp(current_options.zigbee_rx,"")){

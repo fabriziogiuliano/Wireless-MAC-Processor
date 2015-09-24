@@ -2,6 +2,7 @@
 #define LIBB43_H
 
 #include <stdio.h>
+#include <stdlib.h>
 
 #define B43_SHM_UCODE   	0
 #define B43_SHM_SHARED 		1
@@ -24,6 +25,15 @@
 #define B43_MACCTL_PSM_JMP0	0x00000004
 #define B43_MACCTL_PSM_DEBUG	0x00002000
 
+
+/* TSF */
+#define B43_MMIO_TSF_0			0x632	/* core rev < 3 only */
+#define B43_MMIO_TSF_1			0x634	/* core rev < 3 only */
+#define B43_MMIO_TSF_2			0x636	/* core rev < 3 only */
+#define B43_MMIO_TSF_3			0x638	/* core rev < 3 only */
+
+
+
 struct debugfs_file{
 	FILE * f_mmio16read;
 	FILE * f_mmio16write;
@@ -39,7 +49,7 @@ void init_file(struct debugfs_file * df);
 void close_file(struct debugfs_file * df);
 
 
-int read16(struct debugfs_file * df, int reg);
+u_int16_t read16(struct debugfs_file * df, int reg);
 void maskSet16(struct debugfs_file * df, int reg, int mask, int set);
 void write16(struct debugfs_file * df, int reg, int value);
 unsigned int shmRead16(struct debugfs_file * df, int routing, int offset);

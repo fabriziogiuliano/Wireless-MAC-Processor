@@ -2,15 +2,33 @@
 #include <string.h>
 #include <sys/types.h>
 #include <stdlib.h>
+#include <time.h>
 #include <unistd.h>
 #include <errno.h>
 #include <dirent.h>
+
+#include <sys/socket.h>
+#include <netdb.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <netinet/tcp.h>
+#include <time.h>       /* time_t, struct tm, time, localtime, strftime */
+
+
+#include <errno.h>
+#include <fcntl.h>
+#include <netinet/in.h>
+#include <sys/ioctl.h>
+
+#include <pwd.h>
+#include <getopt.h>
+#include <sys/time.h>
+
 #include "libb43.h"
 #include "hex2int.h"
 #include "dataParser.h"
 #include "vars.h"
-#include <time.h>       /* time_t, struct tm, time, localtime, strftime */
-#include <sys/time.h>
+
 
 
 void init_file(struct debugfs_file * df){
@@ -59,11 +77,11 @@ void close_file( struct debugfs_file * df){
 
 
 
-int read16(struct debugfs_file * df, int reg){
+u_int16_t read16(struct debugfs_file * df, int reg){
 
 	/* """Do a 16bit MMIO read""" */
 	char buffer[256];
-	unsigned int ret=0;
+	unsigned int u_int16_t=0;
 	
 	rewind (df->f_mmio16read);
 	fprintf (df->f_mmio16read, "0x%X",reg);
@@ -304,6 +322,35 @@ void getOffsetRegs(struct debugfs_file * df){
 	printf("\n");
 
 }
+
+
+void getTSFRegs(struct debugfs_file * df, uint64_t * tsf){
+	uint64_t tmp;
+	uint16_t v0, v1, v2, v3;
+        uint16_t test1, test2, test3;
+	do {
+                        v3 = read16(df, B43_MMIO_TSF_3);
+                        v2 = read16(df, B43_MMIO_TSF_2);
+                        v1 = read16(df, B43_MMIO_TSF_1);
+                        v0 = read16(df, B43_MMIO_TSF_0);
+ 
+                        test3 = read16(df, B43_MMIO_TSF_3);
+                        test2 = read16(df, B43_MMIO_TSF_2);
+                        test1 = read16(df, B43_MMIO_TSF_1);
+        } while (v3 != test3 || v2 != test2 || v1 != test1);
+        *tsf = v3;
+        *tsf <<= 48;
+        tmp = v2;
+        tmp <<= 32;
+        *tsf |= tmp;
+        tmp = v1;
+        tmp <<= 16;
+        *tsf |= tmp;
+        *tsf |= v0;
+}
+
+
+
 
 void ucodeStop(struct debugfs_file * df){
   //Unconditionally stop the microcode PSM
