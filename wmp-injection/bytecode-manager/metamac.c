@@ -4,6 +4,7 @@
 #include <sys/time.h>
 #include <unistd.h>
 #include <err.h>
+#include <stdint.h>
 
 #include "metamac.h"
 #include "protocols.h"
@@ -207,20 +208,15 @@ int metamac_read_loop(struct metamac_queue *queue, struct debugfs_file *df, meta
 	unsigned int transmit_other;
 	unsigned int channel_busy;
 	unsigned long slot_num = 0;
-	
-	long int usec;
-	long int usec_from_start;
-	long int usec_from_current;
-	
-	struct timeval starttime, finishtime;
-	struct timeval start7slot, finish7slot;
+
+	uint64_t start_time, start7slot, usec_from_current;
 
 	struct metamac_slot slots[16];
 	int slot_index = 0;
 
-	gettimeofday(&starttime, NULL);
+	getTSFRegs(df, &start_time);
 	usec_from_current = 0;
-	start7slot= starttime;
+	start7slot= start_time;
 	k=0;
 
 	prev_slot_count = 0x000F & shmRead16(df, B43_SHM_REGS, COUNT_SLOT);	//get current time slot number
@@ -231,6 +227,12 @@ int metamac_read_loop(struct metamac_queue *queue, struct debugfs_file *df, meta
 		usleep(7000);
 
 		// Read meta-MAC value, generally we need 5ms to do it
+		uint64_t current_time;
+		getTSFRegs(df, &current_time);
+		uint64_t usec_from_start = current_time - start_time;
+		uint64_t usec = current_time - start7slot;
+		start7slot = current_time;
+
 		prev_slot_count = slot_count & 0x000F;
 		slot_count = shmRead16(df, B43_SHM_REGS, COUNT_SLOT);
 		packet_queued = shmRead16(df, B43_SHM_SHARED, PACKET_TO_TRANSMIT);
@@ -238,20 +240,7 @@ int metamac_read_loop(struct metamac_queue *queue, struct debugfs_file *df, meta
 		transmit_success = shmRead16(df, B43_SHM_SHARED, SUCCES_TRANSMISSION);
 		transmit_other = shmRead16(df, B43_SHM_SHARED, OTHER_TRANSMISSION);
 		channel_busy = (transmitted & ~transmit_success) | transmit_other;
-		
-		// Compute cycle time
-		gettimeofday(&finish7slot, NULL);	    
-		usec = (finish7slot.tv_sec - start7slot.tv_sec) * 1000000;
-		usec += (finish7slot.tv_usec - start7slot.tv_usec);
-		usec_from_start = (finish7slot.tv_sec - starttime.tv_sec) * 1000000;
-		usec_from_start += (finish7slot.tv_usec - starttime.tv_usec);
-		start7slot = finish7slot;
-		
-		// print debug values
-		//printf("%d - %ld\n", j, usec);
-		//printf("slot_count:0x%04X - packet_queued:0x%04X - transmitted:0x%04X - transmit_success:0x%04X - transmit_other:0x%04X\n", slot_count, packet_queued, transmitted, transmit_success, transmit_other);
-		//printf("%d - %d - %s,%d,%d,%ld\n", i, count_change, buffer, 251, 0,usec);    
-		  
+
 		// check if cycle time is over, we must be sure to read at least every 16ms
 		if ((prev_slot_count == (slot_count & 0x000F)) || usec > 16000 || j == 0)
 		{

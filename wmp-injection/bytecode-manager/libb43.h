@@ -3,6 +3,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 
 #define B43_SHM_UCODE   	0
 #define B43_SHM_SHARED 		1
@@ -67,8 +68,7 @@ void shmMaskSet32(struct debugfs_file * df, int routing, int offset, int mask, i
 
 void shmSharedRead(struct debugfs_file * df);
 void getGprs(struct debugfs_file * df);
-
-
+void getTSFRegs(struct debugfs_file * df, uint64_t * tsf);
 
 void __debugfs_find(char *);
 
