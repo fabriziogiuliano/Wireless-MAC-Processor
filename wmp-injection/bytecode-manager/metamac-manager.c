@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <argp.h>
 #include <signal.h>
+#include <sched.h>
 #include <string.h>
 #include <pthread.h>
 #include <err.h>
@@ -98,6 +99,12 @@ struct thread_params {
 static void *run_read_loop(void *arg)
 {
 	struct thread_params *params = arg;
+
+	/* Set the scheduling policy for this thread to SCHED_FIFO
+	and the priority to 98 (second highest). */
+	struct sched_param param { .sched_priority = 98 };
+	pthread_setschedparam(pthread_self(), SCHED_FIFO, &param);
+
 	return (void*)metamac_read_loop(&params->queue, &params->df, params->flags);
 }
 

@@ -46,3 +46,8 @@ metamac-manager.o: metamac.h parseconfig.h metamac-manager.c
 	$(CC) $(CFLAGS) $(MMCFLAGS) -c metamac-manager.c
 metamac: $(MMOBJECTS)
 	$(CC)  $(MMOBJECTS) $(MMLFLAGS)  $(CFLAGS) -o metamac
+
+tsfrecorder.o: libb43.h tsfrecorder.c
+	$(CC) $(CFLAGS) $(MMCFLAGS) -c tsfrecorder.c
+tsfrecorder: tsfrecorder.o libb43.o hex2int.o dataParser.o bytecode-work.o
+	$(CC) tsfrecorder.o libb43.o hex2int.o dataParser.o bytecode-work.o $(MMLFLAGS)  $(CFLAGS) -o tsfrecorder

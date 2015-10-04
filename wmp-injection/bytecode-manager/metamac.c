@@ -247,6 +247,7 @@ int metamac_read_loop(struct metamac_queue *queue, struct debugfs_file *df, meta
 			// if last cycle is over 16ms or if we change bytecode, we fill time sloc with 0, no information for this slot time
 			//printf("read error\n");
 			if(usec > 100000) {
+				fprintf(stderr, "Exiting due to %llu usec delay between reads.", usec);
 				exit(1);
 			}
 
