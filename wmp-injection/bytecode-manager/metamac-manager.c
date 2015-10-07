@@ -102,7 +102,7 @@ static void *run_read_loop(void *arg)
 
 	/* Set the scheduling policy for this thread to SCHED_FIFO
 	and the priority to 98 (second highest). */
-	struct sched_param param { .sched_priority = 98 };
+	struct sched_param param = { .sched_priority = 98 };
 	pthread_setschedparam(pthread_self(), SCHED_FIFO, &param);
 
 	return (void*)metamac_read_loop(&params->queue, &params->df, params->flags);
