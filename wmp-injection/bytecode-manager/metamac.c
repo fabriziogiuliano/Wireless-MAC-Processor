@@ -83,10 +83,6 @@ void init_protocol_suite(struct protocol_suite *suite, int num_protocols, double
 
 void free_protocol_suite(struct protocol_suite *suite)
 {
-	for (int i = 0; i < suite->num_protocols; i++) {
-		free_protocol(&suite->protocols[i]);
-	}
-
 	free(suite->protocols);
 	free(suite->weights);
 	free(suite);
@@ -191,7 +187,7 @@ static void metamac_switch(struct debugfs_file *df, struct protocol_suite *suite
 	}
 }
 
-int metamac_loop_break = 0;
+volatile int metamac_loop_break = 0;
 
 int metamac_read_loop(struct metamac_queue *queue, struct debugfs_file *df, metamac_flag_t flags)
 {
@@ -315,6 +311,9 @@ int metamac_read_loop(struct metamac_queue *queue, struct debugfs_file *df, meta
 			}
 		}
 	}
+
+	usleep(10000);
+	queue_signal(queue);
 
 	return metamac_loop_break;
 }

@@ -80,7 +80,7 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state)
 
 static struct argp argp = { options, parse_opt, args_doc, doc };
 
-static void inthandler(int signum, siginfo_t *info, void *ptr)
+static void sigint_handler(int signum, siginfo_t *info, void *ptr)
 {
 	if (signum == SIGINT) {
 		printf("Received SIGINT, exiting...");
@@ -88,7 +88,7 @@ static void inthandler(int signum, siginfo_t *info, void *ptr)
 	}
 }
 
-static struct sigaction act;
+static struct sigaction sigact;
 
 struct thread_params {
 	struct metamac_queue queue;
@@ -111,9 +111,10 @@ static void *run_read_loop(void *arg)
 int main(int argc, char *argv[])
 {
 	/* Set signal handler for interrupt signal. */
-	act.sa_sigaction = inthandler;
-	act.sa_flags = SA_SIGINFO;
-	sigaction(SIGINT, &act, NULL);
+	memset(&sigact, 0, sizeof(sigact));
+	sigact.sa_sigaction = sigint_handler;
+	sigact.sa_flags = SA_SIGINFO;
+	sigaction(SIGINT, &sigact, NULL);
 
 	/* Parse command line arguments. */
 	struct arguments arguments;

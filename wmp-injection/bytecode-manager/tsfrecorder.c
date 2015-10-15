@@ -19,7 +19,9 @@ int main(int argc, char *argv[])
 	init_file(&df);
 	uint64_t last, current;
 	long reads = 0;
+	signal(SIGINT, sig_handler);
 	getTSFRegs(&df, &last);
+	printf("%lld\n", (long long)last);
 
 	while (break_loop == 0) {
 		getTSFRegs(&df, &current);

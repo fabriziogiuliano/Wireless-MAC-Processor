@@ -86,7 +86,7 @@ int metamac_read_loop(struct metamac_queue *queue, struct debugfs_file *df,
 int metamac_process_loop(struct metamac_queue *queue, struct debugfs_file *df,
 	struct protocol_suite *suite, metamac_flag_t flags, const char *logpath);
 
-extern int metamac_loop_break;
+extern volatile int metamac_loop_break;
 
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof(a[0]))
 

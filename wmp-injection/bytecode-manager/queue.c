@@ -112,3 +112,10 @@ size_t queue_multipop(struct metamac_queue *queue, struct metamac_slot *slots, s
 
 	return i;
 }
+
+void queue_signal(struct metamac_queue *queue)
+{
+	if (pthread_cond_broadcast(&queue->nonempty_cond) != 0) {
+		err(EXIT_FAILURE, "Error signaling condition variable");
+	}
+}

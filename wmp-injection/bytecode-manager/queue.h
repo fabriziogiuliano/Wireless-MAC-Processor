@@ -20,5 +20,6 @@ void queue_destroy(struct metamac_queue *queue);
 void queue_push(struct metamac_queue *queue, struct metamac_slot *slot);
 void queue_multipush(struct metamac_queue *queue, struct metamac_slot *slots, size_t count);
 size_t queue_multipop(struct metamac_queue *queue, struct metamac_slot *slots, size_t count);
+void queue_signal(struct metamac_queue *queue);
 
 #endif
