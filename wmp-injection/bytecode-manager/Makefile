@@ -30,7 +30,7 @@ bytecode-work.o: bytecode-work.c
 clean:
 	- rm *.o bytecode-manager metamac
 
-MMCFLAGS=-std=gnu99 -Wall -g $(shell pkg-config libxml-2.0 --cflags)
+MMCFLAGS=-std=gnu99 -Wall -O3 $(shell pkg-config libxml-2.0 --cflags)
 MMLFLAGS=-lm $(shell pkg-config libxml-2.0 --libs) -pthread
 MMOBJECTS=metamac.o protocols.o parseconfig.o queue.o metamac-manager.o libb43.o hex2int.o dataParser.o bytecode-work.o
 
@@ -51,3 +51,8 @@ tsfrecorder.o: libb43.h tsfrecorder.c
 	$(CC) $(CFLAGS) $(MMCFLAGS) -c tsfrecorder.c
 tsfrecorder: tsfrecorder.o libb43.o hex2int.o dataParser.o bytecode-work.o
 	$(CC) tsfrecorder.o libb43.o hex2int.o dataParser.o bytecode-work.o $(MMLFLAGS)  $(CFLAGS) -o tsfrecorder
+
+slotrecorder.o: libb43.h slotrecorder.c
+	$(CC) $(CFLAGS) $(MMCFLAGS) -c slotrecorder.c
+slotrecorder: slotrecorder.o libb43.o hex2int.o
+	$(CC) slotrecorder.o libb43.o hex2int.o -pthread $(CFLAGS) -o slotrecorder
