@@ -5,6 +5,7 @@
 #include <signal.h>
 #include <pthread.h>
 #include <unistd.h>
+#include <argp.h>
 
 #include <time.h>
 
@@ -149,10 +150,11 @@ static void queue_signal(struct queue *queue)
 
 static volatile int break_loop = 0;
 
-static void read_loop(struct queue *queue, struct debugfs_file *df)
+static void read_loop(struct queue *queue, struct debugfs_file *df, int interval)
 {
 	struct timespec starttime;
 	clock_gettime(CLOCK_MONOTONIC_RAW, &starttime);
+	int64_t target = 0;
 
 	while (break_loop == 0) {
 		struct timespec currenttime;
@@ -184,6 +186,12 @@ static void read_loop(struct queue *queue, struct debugfs_file *df)
 		};
 
 		queue_push(queue, &current_slot);
+
+		target += interval;
+		int64_t diff = target - host_finish;
+		if (diff > 0) {
+			usleep(diff);
+		}
 	}
 
 	fprintf(stderr, "Exiting read loop.");
@@ -195,22 +203,29 @@ static void read_loop(struct queue *queue, struct debugfs_file *df)
 
 static void process_loop(struct queue *queue, struct debugfs_file *df)
 {
-	printf("host_start,host_finish,tsf_counter,slot_count,packet_queued,transmitted,transmit_success,transmit_other\n");
+	printf("host_start,host_finish,host_diff,tsf_counter,tsf_diff,slot_count,packet_queued,transmitted,transmit_success,transmit_other\n");
+	uint64_t last_host = 0;
+	uint64_t last_tsf = 0;
 
 	while (break_loop == 0) {
 		struct slot slots[10];
 		size_t count = queue_multipop(queue, slots, ARRAY_SIZE(slots));
 
 		for (size_t i = 0; i < count; i++) {
-			printf("%llu,%llu,%llu,%d,%x,%x,%x,%x\n",
+			printf("%llu,%llu,%llu,%llu,%llu,%d,%x,%x,%x,%x\n",
 				(long long)slots[i].host_start,
 				(long long)slots[i].host_finish,
+				(long long)slots[i].host_start - last_host,
 				(long long)slots[i].tsf_counter,
-				slots[i].slot_count,
+				(long long)slots[i].tsf_counter - last_tsf,
+				slots[i].slot_count & 0xf,
 				slots[i].packet_queued,
 				slots[i].transmitted,
 				slots[i].transmit_success,
 				slots[i].transmit_other);
+
+			last_host = slots[i].host_start;
+			last_tsf = slots[i].tsf_counter;
 		}
 	}
 
@@ -228,14 +243,50 @@ static void sigint_handler(int signum, siginfo_t *info, void *ptr)
 static struct sigaction sigact;
 static struct queue queue;
 static struct debugfs_file df;
+static int read_interval;
 
 static void *run_read_loop(void *unused)
 {
 	struct sched_param param = { .sched_priority = 98 };
 	pthread_setschedparam(pthread_self(), SCHED_FIFO, &param);
-	read_loop(&queue, &df);
+	read_loop(&queue, &df, read_interval);
 	return NULL;
 }
+
+const char *argp_program_version = "SlotRecorder Diagnostic Tool 0.0.1";
+static const char doc[] = "Records WMP network card activity.";
+static const char args_doc[] = "";
+
+static const struct argp_option options[] = {
+	{ "interval", 'i', "INTERVAL", 0, "Interval between reads in microseconds." },
+	{ 0 }
+};
+
+struct arguments {
+	int interval;
+};
+
+static error_t parse_opt(int key, char *arg, struct argp_state *state)
+{
+	struct arguments *arguments = state->input;
+	uint interval;
+
+	switch (key) {
+	case 'i':
+		if (sscanf(arg, "%u", &interval) < 1) {
+			argp_error(state, "Invalid value for argument 'interval'.");
+		}
+		arguments->interval = interval;
+		break;
+
+	default:
+		return ARGP_ERR_UNKNOWN;
+	}
+
+	return 0;
+}
+
+static const struct argp argp = { options, parse_opt, args_doc, doc };
 
 int main(int argc, char *argv[])
 {
@@ -244,6 +295,12 @@ int main(int argc, char *argv[])
 	sigact.sa_sigaction = sigint_handler;
 	sigact.sa_flags = SA_SIGINFO;
 	sigaction(SIGINT, &sigact, NULL);
+
+	/* Parse command line arguments. */
+	struct arguments arguments;
+	memset(&arguments, 0, sizeof(arguments));
+	argp_parse(&argp, argc, argv, 0, 0, &arguments);
+	read_interval = arguments.interval;
 
 	queue_init(&queue, 1024);
 	init_file(&df);
