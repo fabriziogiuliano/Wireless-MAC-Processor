@@ -17,13 +17,10 @@ typedef enum {
 struct metamac_slot {
 	unsigned long slot_num;
 	unsigned long read_num;
-
-	unsigned long read_usecs;
-	unsigned long slot_calc_usecs;
-	unsigned long usecs_diff;
-
-	unsigned int slot_count;
-	unsigned int slot_count_var;
+	uint64_t host_time;
+	uint64_t tsf_time;
+	int slot_index;
+	int slots_passed;
 
 	/* Indicates if this slot was filled in because of a delay in
 	reading from the board. */
@@ -82,7 +79,7 @@ void update_weights(struct protocol_suite *suite, struct metamac_slot slot);
 void metamac_init(struct debugfs_file * df, struct protocol_suite *suite, metamac_flag_t flags);
 
 int metamac_read_loop(struct metamac_queue *queue, struct debugfs_file *df,
-	metamac_flag_t flags);
+	metamac_flag_t flags, int slot_time, int read_interval);
 int metamac_process_loop(struct metamac_queue *queue, struct debugfs_file *df,
 	struct protocol_suite *suite, metamac_flag_t flags, const char *logpath);
 

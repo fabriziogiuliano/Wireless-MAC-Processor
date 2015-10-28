@@ -105,7 +105,7 @@ static void *run_read_loop(void *arg)
 	struct sched_param param = { .sched_priority = 98 };
 	pthread_setschedparam(pthread_self(), SCHED_FIFO, &param);
 
-	return (void*)metamac_read_loop(&params->queue, &params->df, params->flags);
+	return (void*)metamac_read_loop(&params->queue, &params->df, params->flags, 2200, 13200);
 }
 
 int main(int argc, char *argv[])
