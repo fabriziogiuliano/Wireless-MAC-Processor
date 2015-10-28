@@ -187,6 +187,9 @@ static void metamac_switch(struct debugfs_file *df, struct protocol_suite *suite
 	}
 }
 
+#define BAD_RECEPTION 0x00FA
+#define BUSY_SLOT     0x00FC
+
 volatile int metamac_loop_break = 0;
 
 int metamac_read_loop(struct metamac_queue *queue, struct debugfs_file *df,
@@ -201,7 +204,7 @@ int metamac_read_loop(struct metamac_queue *queue, struct debugfs_file *df,
 
 	getTSFRegs(df, &initial_tsf);
 	tsf = initial_tsf;
-	slot_index = shmRead16(df, B43_SHM_REGS, COUNT_SLOT) & 0xf;
+	slot_index = shmRead16(df, B43_SHM_REGS, COUNT_SLOT) & 0x7;
 
 	while (metamac_loop_break == 0) {
 
@@ -213,13 +216,15 @@ int metamac_read_loop(struct metamac_queue *queue, struct debugfs_file *df,
 		last_tsf = tsf;
 		getTSFRegs(df, &tsf);
 		last_slot_index = slot_index;
-		slot_index = shmRead16(df, B43_SHM_REGS, COUNT_SLOT) ;
+		slot_index = shmRead16(df, B43_SHM_REGS, COUNT_SLOT) & 0x7;
 
 		int packet_queued = shmRead16(df, B43_SHM_SHARED, PACKET_TO_TRANSMIT);
 		int transmitted = shmRead16(df, B43_SHM_SHARED, MY_TRANSMISSION);
 		int transmit_success = shmRead16(df, B43_SHM_SHARED, SUCCES_TRANSMISSION);
 		int transmit_other = shmRead16(df, B43_SHM_SHARED, OTHER_TRANSMISSION);
-		int channel_busy = (transmitted & ~transmit_success) | transmit_other;
+		int bad_reception = shmRead16(df, B43_SHM_SHARED, BAD_RECEPTION);
+		int busy_slot = shmRead16(df, B43_SHM_SHARED, BUSY_SLOT);
+		int channel_busy = (transmitted & ~transmit_success) | transmit_other | bad_reception | busy_slot;
 
 		int slots_passed = slot_index - last_slot_index;
 		slots_passed = slots_passed < 0 ? slots_passed + 8 : slots_passed;
@@ -263,6 +268,8 @@ int metamac_read_loop(struct metamac_queue *queue, struct debugfs_file *df,
 				.transmitted = 0,
 				.transmit_success = 0,
 				.transmit_other = 0,
+				.bad_reception = 0,
+				.busy_slot = 0,
 				.channel_busy = 0
 			};
 
@@ -287,7 +294,10 @@ int metamac_read_loop(struct metamac_queue *queue, struct debugfs_file *df,
 			slots[ai].transmitted = (transmitted >> si) & 1;
 			slots[ai].transmit_success = (transmit_success >> si) & 1;
 			slots[ai].transmit_other = (transmit_other >> si) & 1;
+			slots[ai].bad_reception = (bad_reception >> si) & 1;
+			slots[ai].busy_slot = (busy_slot >> si) & 1;
 			slots[ai].channel_busy = (channel_busy >> si) & 1;
+			ai++;
 		}
 
 		queue_multipush(queue, slots, ai);

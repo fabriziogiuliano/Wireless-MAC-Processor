@@ -31,8 +31,10 @@ struct metamac_slot {
 	uchar transmitted : 1;
 	/* Indicates that a transmission was successful in this slot. */
 	uchar transmit_success : 1;
-	/* Indicates that another node attempted a transmission in this slot. */
+	/* Various measures for whether another node attempted to transmit. */
 	uchar transmit_other : 1;
+	uchar bad_reception : 1;
+	uchar busy_slot : 1;
 	/* Indicates that either a transmission attempt was unsuccessful
 	in this slot or another node attempted a transmission. */
 	uchar channel_busy : 1;
