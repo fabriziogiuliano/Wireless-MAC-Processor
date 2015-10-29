@@ -187,8 +187,8 @@ static void metamac_switch(struct debugfs_file *df, struct protocol_suite *suite
 	}
 }
 
-#define BAD_RECEPTION 0x00FA
-#define BUSY_SLOT     0x00FC
+#define BAD_RECEPTION       0x00FA
+#define BUSY_SLOT           0x00FC
 
 volatile int metamac_loop_break = 0;
 
@@ -218,20 +218,20 @@ int metamac_read_loop(struct metamac_queue *queue, struct debugfs_file *df,
 		last_slot_index = slot_index;
 		slot_index = shmRead16(df, B43_SHM_REGS, COUNT_SLOT) & 0x7;
 
-		int packet_queued = shmRead16(df, B43_SHM_SHARED, PACKET_TO_TRANSMIT);
-		int transmitted = shmRead16(df, B43_SHM_SHARED, MY_TRANSMISSION);
-		int transmit_success = shmRead16(df, B43_SHM_SHARED, SUCCES_TRANSMISSION);
-		int transmit_other = shmRead16(df, B43_SHM_SHARED, OTHER_TRANSMISSION);
-		int bad_reception = shmRead16(df, B43_SHM_SHARED, BAD_RECEPTION);
-		int busy_slot = shmRead16(df, B43_SHM_SHARED, BUSY_SLOT);
-		int channel_busy = (transmitted & ~transmit_success) | transmit_other | bad_reception | busy_slot;
+		uint packet_queued = shmRead16(df, B43_SHM_SHARED, PACKET_TO_TRANSMIT);
+		uint transmitted = shmRead16(df, B43_SHM_SHARED, MY_TRANSMISSION);
+		uint transmit_success = shmRead16(df, B43_SHM_SHARED, SUCCES_TRANSMISSION);
+		uint transmit_other = shmRead16(df, B43_SHM_SHARED, OTHER_TRANSMISSION);
+		uint bad_reception = shmRead16(df, B43_SHM_SHARED, BAD_RECEPTION);
+		uint busy_slot = shmRead16(df, B43_SHM_SHARED, BUSY_SLOT);
+		uint channel_busy = (transmitted & ~transmit_success) | transmit_other | bad_reception | busy_slot;
 
 		int slots_passed = slot_index - last_slot_index;
 		slots_passed = slots_passed < 0 ? slots_passed + 8 : slots_passed;
 		int64_t actual = ((int64_t)tsf) - ((int64_t)last_tsf);
 
 		if (actual < 0) {
-			fprintf(stderr, "Recieved TSF difference of %lld between consecutive reads.\n", (long long)actual);
+			fprintf(stderr, "Received TSF difference of %lld between consecutive reads.\n", (long long)actual);
 			metamac_loop_break = 1; // Stop the process loop.
 			break;
 		}
@@ -306,7 +306,7 @@ int metamac_read_loop(struct metamac_queue *queue, struct debugfs_file *df,
 		uint64_t loop_end = (current_time.tv_sec - start_time.tv_sec) * 1000000L +
 			(current_time.tv_nsec - start_time.tv_nsec) / 1000L;
 
-		uint64_t delay = loop_start + read_interval - loop_end;
+		int64_t delay = ((int64_t)loop_start) + read_interval - ((int64_t)loop_end);
 		if (delay > 0) {
 			usleep(delay);
 		}
@@ -330,7 +330,7 @@ int metamac_process_loop(struct metamac_queue *queue, struct debugfs_file *df,
 			err(EXIT_FAILURE, "Unable to open log file");
 		}
 
-		fprintf(logfile, "slot_num,read_num,host_time,tsf_time,slot_index,slots_passed,filler,packet_queued,transmitted,transmit_success,transmit_other,channel_busy\n");
+		fprintf(logfile, "slot_num,read_num,host_time,tsf_time,slot_index,slots_passed,filler,packet_queued,transmitted,transmit_success,transmit_other,bad_reception,busy_slot,channel_busy\n");
 		printf("Logging to %s\n", logpath);
 	} else {
 		logfile = NULL;
@@ -348,7 +348,7 @@ int metamac_process_loop(struct metamac_queue *queue, struct debugfs_file *df,
 
 		for (int i = 0; i < count; i++) {
 			if (logfile != NULL) {
-				fprintf(logfile, "%llu,%llu,%llu,%llu,%d,%d,%01x,%01x,%01x,%01x,%01x,%01x\n",
+				fprintf(logfile, "%llu,%llu,%llu,%llu,%d,%d,%01x,%01x,%01x,%01x,%01x,%01x,%01x,%01x\n",
 					(unsigned long long) slots[i].slot_num,
 					(unsigned long long) slots[i].read_num,
 					(unsigned long long) slots[i].host_time,
@@ -360,6 +360,8 @@ int metamac_process_loop(struct metamac_queue *queue, struct debugfs_file *df,
 					slots[i].transmitted,
 					slots[i].transmit_success,
 					slots[i].transmit_other,
+					slots[i].bad_reception,
+					slots[i].busy_slot,
 					slots[i].channel_busy);
 			}
 
