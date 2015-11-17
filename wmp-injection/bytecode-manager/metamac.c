@@ -144,17 +144,17 @@ static void metamac_display(unsigned long loop, struct protocol_suite *suite)
 static void metamac_switch(struct debugfs_file *df, struct protocol_suite *suite)
 {
 	/* Identify the best and second-best protocols. */
-	int best = 0, second = 0;
+	/*int best = 0, second = 0;
 	for (int i = 0; i < suite->num_protocols; i++) {
 		if (suite->weights[i] > suite->weights[best]) {
 			second = best;
 			best = i;
 		}
-	}
+	}*/
 
-	if (best != suite->active_protocol) {
+	/*if (best != suite->active_protocol) {*/
 		/* Protocol switch necessitated. */
-		struct options opt;
+		/*struct options opt;
 
 		if (best == suite->slots[0]) {
 			opt.active = "1";
@@ -166,12 +166,14 @@ static void metamac_switch(struct debugfs_file *df, struct protocol_suite *suite
 			writeAddressBytecode(df, &opt);
 			suite->active_slot = 1;
 
-		} else if (second == suite->slots[0]) {
+		} else if (second == suite->slots[0]) {*/
 			/* If second best protocol is already in slot 1, then load
 			best into slot 2. */
-			opt.load = "2";
+			/*opt.load = "2";
 			opt.name_file = suite->protocols[best].fsm_path;
 			bytecodeSharedWrite(df, &opt);
+			opt.active = "2";
+			writeAddressBytecode(df, &opt);
 			suite->slots[1] = best;
 			suite->active_slot = 1;
 
@@ -179,12 +181,23 @@ static void metamac_switch(struct debugfs_file *df, struct protocol_suite *suite
 			opt.load = "1";
 			opt.name_file = suite->protocols[best].fsm_path;
 			bytecodeSharedWrite(df, &opt);
+			opt.active = "1";
+			writeAddressBytecode(df, &opt);
 			suite->slots[0] = best;
 			suite->active_slot = 0;
 		}
 
 		suite->active_protocol = best;
-	}
+	}*/
+
+	int active_protocol = (suite->active_protocol + 1) % suite->num_protocols;
+	struct options opt;
+	opt.load = "1";
+	opt.name_file = suite->protocols[active_protocol].fsm_path;
+	opt.active = "1";
+	bytecodeSharedWrite(df, &opt);
+	writeAddressBytecode(df, &opt);
+	suite->active_protocol = active_protocol;
 }
 
 #define BAD_RECEPTION       0x00FA
