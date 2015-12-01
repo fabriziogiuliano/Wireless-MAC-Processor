@@ -21,7 +21,6 @@ static struct argp_option options[] = {
 	{ "verbose",  'v', 0,      0, "Verbose output." },
 	{ "logfile",  'l', "FILE", 0, "File to log MAC feedback for each slot." },
 	{ "readonly", 'r', 0,      0, "Do not update running protocol." },
-	{ "fsm-path", 'p', "PATH", 0, "Base path for FSM files." },
 	{ 0 }
 };
 
@@ -48,10 +47,6 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state)
 
 	case 'r':
 		arguments->metamac_flags |= FLAG_READONLY;
-		break;
-
-	case 'p':
-		arguments->fsm_basepath = arg;
 		break;
 
 	case ARGP_KEY_ARG:
@@ -104,8 +99,9 @@ static void *run_read_loop(void *arg)
 	and the priority to 98 (second highest). */
 	struct sched_param param = { .sched_priority = 98 };
 	pthread_setschedparam(pthread_self(), SCHED_FIFO, &param);
+	metamac_read_loop(&params->queue, &params->df, params->flags, 2200, 13200);
 
-	return (void*)metamac_read_loop(&params->queue, &params->df, params->flags, 2200, 13200);
+	return (void*)NULL;
 }
 
 int main(int argc, char *argv[])
@@ -121,7 +117,7 @@ int main(int argc, char *argv[])
 	memset(&arguments, 0, sizeof(arguments));
 	argp_parse(&argp, argc, argv, 0, 0, &arguments);
 
-	struct protocol_suite *suite = read_config(argv[0], arguments.config, arguments.fsm_basepath);
+	struct protocol_suite *suite = read_config(argv[0], arguments.config);
 	struct thread_params *params = malloc(sizeof(struct thread_params));
 	if (!params) {
 		err(EXIT_FAILURE, "Unable to allocate memory");

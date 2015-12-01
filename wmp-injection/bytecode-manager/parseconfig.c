@@ -261,8 +261,7 @@ void read_protocol(struct protocol *proto, xmlNode *protocol_node, const char *f
 	xmlFree(type);
 }
 
-struct protocol_suite *read_config(const char *program_name,
-	const char *file_name, const char *fsm_basepath)
+struct protocol_suite *read_config(const char *program_name, const char *file_name)
 {
 	xmlDoc *doc = xmlParseFile(file_name);
 	if (!doc) {
@@ -308,6 +307,18 @@ struct protocol_suite *read_config(const char *program_name,
 	}
 
 	init_protocol_suite(suite, num_protocols, eta);
+
+	int prefix_len;
+	for (prefix_len = strlen(file_name) - 1; prefix_len >= 0; prefix_len--) {
+		if (file_name[prefix_len] == '/') {
+			prefix_len++;
+			break;
+		}
+	}
+
+	char *fsm_basepath = alloca(prefix_len + 1);
+	memcpy(fsm_basepath, file_name, prefix_len);
+	fsm_basepath[prefix_len] = '\0';
 
 	xmlNode *protocol_node = metamac_node->children;
 	int index = 0;

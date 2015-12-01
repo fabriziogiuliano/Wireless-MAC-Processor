@@ -4,7 +4,7 @@
 		<fsm path="tdma-0.txt"></fsm>
 		<emulator type="tdma">
 			<param key="frame_offset" value="0"/>
-			<param key="frame_length" value="8"/>
+			<param key="frame_length" value="4"/>
 			<param key="slot_assignment" value="0"/>
 		</emulator>
 	</protocol>
@@ -12,7 +12,7 @@
 		<fsm path="tdma-1.txt"></fsm>
 		<emulator type="tdma">
 			<param key="frame_offset" value="0"/>
-			<param key="frame_length" value="8"/>
+			<param key="frame_length" value="4"/>
 			<param key="slot_assignment" value="1"/>
 		</emulator>
 	</protocol>
@@ -20,7 +20,7 @@
 		<fsm path="tdma-2.txt"></fsm>
 		<emulator type="tdma">
 			<param key="frame_offset" value="0"/>
-			<param key="frame_length" value="8"/>
+			<param key="frame_length" value="4"/>
 			<param key="slot_assignment" value="2"/>
 		</emulator>
 	</protocol>
@@ -28,7 +28,7 @@
 		<fsm path="tdma-3.txt"></fsm>
 		<emulator type="tdma">
 			<param key="frame_offset" value="0"/>
-			<param key="frame_length" value="8"/>
+			<param key="frame_length" value="4"/>
 			<param key="slot_assignment" value="3"/>
 		</emulator>
 	</protocol>
