@@ -32,4 +32,36 @@
 			<param key="slot_assignment" value="3"/>
 		</emulator>
 	</protocol>
+	<protocol id="1" name="TDMA (slot 4)">
+		<fsm path="tdma-ap-4.txt"></fsm>
+		<emulator type="tdma">
+			<param key="frame_offset" value="0"/>
+			<param key="frame_length" value="8"/>
+			<param key="slot_assignment" value="4"/>
+		</emulator>
+	</protocol>
+	<protocol id="2" name="TDMA (slot 5)">
+		<fsm path="tdma-ap-5.txt"></fsm>
+		<emulator type="tdma">
+			<param key="frame_offset" value="0"/>
+			<param key="frame_length" value="8"/>
+			<param key="slot_assignment" value="5"/>
+		</emulator>
+	</protocol>
+	<protocol id="3" name="TDMA (slot 6)">
+		<fsm path="tdma-ap-6.txt"></fsm>
+		<emulator type="tdma">
+			<param key="frame_offset" value="0"/>
+			<param key="frame_length" value="8"/>
+			<param key="slot_assignment" value="6"/>
+		</emulator>
+	</protocol>
+	<protocol id="4" name="TDMA (slot 7)">
+		<fsm path="tdma-ap-7.txt"></fsm>
+		<emulator type="tdma">
+			<param key="frame_offset" value="0"/>
+			<param key="frame_length" value="8"/>
+			<param key="slot_assignment" value="7"/>
+		</emulator>
+	</protocol>
 </metamac>
