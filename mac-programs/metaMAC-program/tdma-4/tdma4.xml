@@ -1,7 +1,9 @@
 <?xml version="1.0"?>
 <metamac eta="0.25" initial-protocol="1">
 	<protocol id="1" name="TDMA (slot 0)">
-		<fsm path="tdma-0.txt"></fsm>
+		<fsm path="tdma-0.txt">
+			<param num="11" value="0"/>
+		</fsm>
 		<emulator type="tdma">
 			<param key="frame_offset" value="0"/>
 			<param key="frame_length" value="4"/>
@@ -9,7 +11,9 @@
 		</emulator>
 	</protocol>
 	<protocol id="2" name="TDMA (slot 1)">
-		<fsm path="tdma-1.txt"></fsm>
+		<fsm path="tdma-0.txt">
+			<param num="11" value="1"/>
+		</fsm>
 		<emulator type="tdma">
 			<param key="frame_offset" value="0"/>
 			<param key="frame_length" value="4"/>
@@ -17,7 +21,9 @@
 		</emulator>
 	</protocol>
 	<protocol id="3" name="TDMA (slot 2)">
-		<fsm path="tdma-2.txt"></fsm>
+		<fsm path="tdma-0.txt">
+			<param num="11" value="2"/>
+		</fsm>
 		<emulator type="tdma">
 			<param key="frame_offset" value="0"/>
 			<param key="frame_length" value="4"/>
@@ -25,7 +31,9 @@
 		</emulator>
 	</protocol>
 	<protocol id="4" name="TDMA (slot 3)">
-		<fsm path="tdma-3.txt"></fsm>
+		<fsm path="tdma-0.txt">
+			<param num="11" value="3"/>
+		</fsm>
 		<emulator type="tdma">
 			<param key="frame_offset" value="0"/>
 			<param key="frame_length" value="4"/>

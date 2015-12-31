@@ -479,3 +479,39 @@ void change_parameter(struct debugfs_file * df,  struct options * opt){
 	}
 	printf("Insert value successful\n");
 }
+
+void set_parameter(struct debugfs_file *df, int slot, int num, int value)
+{
+	int param_addr = 0;
+	switch (num){
+	  case 10:
+	    param_addr = 0x16*2;
+	    break;
+	  case 11:
+	    param_addr = 0x21*2;
+	    break;
+	  case 12:
+	    param_addr = 0x1F*2;
+	    break;
+	  case 13:
+	    param_addr = 0x20*2;
+	    break;
+	  case 14:
+	    param_addr = 0x11*2;
+	    break;
+	  case 15:
+	    param_addr = 0x12*2;
+	    break;
+	  case 16:
+	    param_addr = 0x13*2;
+	    break;
+	  case 17:
+	    param_addr = 0x14*2;
+	    break;
+	  default:
+	    return;
+	}
+
+	param_addr += (slot == 0) ? PARAMETER_ADDR_BYTECODE_1 : PARAMETER_ADDR_BYTECODE_2;
+	shmWrite16(df, B43_SHM_SHARED, param_addr, value & 0xffff);
+}

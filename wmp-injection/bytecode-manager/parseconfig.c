@@ -211,6 +211,55 @@ struct tdma_param *read_tdma_params(xmlNode *emulator_node)
 	return param;
 }
 
+void read_fsm_params(xmlNode *fsm_node, struct fsm_param **link)
+{
+	xmlNode *param_node = fsm_node->children;
+	while (param_node) {
+		if (strcmp((char*)param_node->name, "param") != 0) {
+			param_node = param_node->next;
+			continue;
+		}
+
+		char *num_str = (char*)xmlGetProp(param_node, (xmlChar*)"num");
+		char *value_str = (char*)xmlGetProp(param_node, (xmlChar*)"value");
+
+		if (!num_str) {
+			errx(EXIT_FAILURE, "Invalid configuration file: %s.\n", "Missing \"num\" attribute on <param> node");
+		}
+		if (!value_str) {
+			errx(EXIT_FAILURE, "Invalid configuration file: %s.\n", "Missing \"value\" attribute on <param> node");
+		}
+
+		int num, value;
+
+		if (sscanf(num_str, "%d", &num) < 1) {
+			errx(EXIT_FAILURE, "Invalid configuration file: Invalid num value: %s.\n", num_str);
+		}
+		if (sscanf(value_str, "%d", &value) < 1) {
+			errx(EXIT_FAILURE, "Invalid configuration file: Invalid num value: %s.\n", value_str);
+		}
+		if (num < 10 || num > 17) {
+			errx(EXIT_FAILURE, "Invalid configuration file: Only parameters 10-17 are valid.");
+		}
+		if ((value & 0xffff) != value) {
+			errx(EXIT_FAILURE, "Parameter cannot be represented in 16 bits.");
+		}
+
+		xmlFree(num_str);
+		xmlFree(value_str);
+
+		struct fsm_param *param = (struct fsm_param*)malloc(sizeof(struct fsm_param));
+		if (param == NULL) {
+			err(EXIT_FAILURE, "Unable to allocate memory");
+		}
+
+		param->num = num;
+		param->value = value;
+		*link = param;
+		link = &param->next;
+	}
+}
+
 void read_protocol(struct protocol *proto, xmlNode *protocol_node, const char *fsm_basepath)
 {
 	/* Parse id */
@@ -238,6 +287,9 @@ void read_protocol(struct protocol *proto, xmlNode *protocol_node, const char *f
 		errx(EXIT_FAILURE, "Invalid configuration file: %s.\n", "Missing \"path\" attribute on <fsm> node");
 	}
 
+	proto->fsm_params = NULL;
+	read_fsm_params(fsm_node, &proto->fsm_params);
+
 	xmlNode *emulator_node = xml_child_by_name(protocol_node, "emulator");
 	if (!emulator_node) {
 		errx(EXIT_FAILURE, "Invalid configuration file: %s.\n", "Missing \"emulator\" child of <protocol> node");
@@ -261,7 +313,7 @@ void read_protocol(struct protocol *proto, xmlNode *protocol_node, const char *f
 	xmlFree(type);
 }
 
-struct protocol_suite *read_config(const char *program_name, const char *file_name)
+struct protocol_suite *read_config(const char *program_name, const char *file_name, metamac_flag_t metamac_flags)
 {
 	xmlDoc *doc = xmlParseFile(file_name);
 	if (!doc) {
@@ -306,7 +358,7 @@ struct protocol_suite *read_config(const char *program_name, const char *file_na
 		err(EXIT_FAILURE, "Unable to allocate memory");
 	}
 
-	init_protocol_suite(suite, num_protocols, eta);
+	init_protocol_suite(suite, num_protocols, eta, metamac_flags);
 
 	int prefix_len;
 	for (prefix_len = strlen(file_name) - 1; prefix_len >= 0; prefix_len--) {

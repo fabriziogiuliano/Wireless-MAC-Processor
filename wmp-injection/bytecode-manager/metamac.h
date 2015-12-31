@@ -11,7 +11,8 @@ typedef unsigned int uint;
 typedef enum {
 	FLAG_VERBOSE = 1,
 	FLAG_LOGGING = 2,
-	FLAG_READONLY = 4
+	FLAG_READONLY = 4,
+	FLAG_CYCLE = 8
 } metamac_flag_t;
 
 struct metamac_slot {
@@ -42,6 +43,15 @@ struct metamac_slot {
 
 typedef double (*protocol_emulator)(void *param, int slot_num, struct metamac_slot previous_slot);
 
+struct fsm_param {
+	/* Parameter number. */
+	int num;
+	/* Parameter value. */
+	int value;
+	/* Linked list. */
+	struct fsm_param *next;
+};
+
 struct protocol {
 	/* Unique identifier. */
 	int id;
@@ -49,6 +59,8 @@ struct protocol {
 	char *name;
 	/* Path to the compiled (.txt) FSM implementation. */
 	char *fsm_path;
+	/* Parameters for the FSM. */
+	struct fsm_param *fsm_params;
 	/* Protocol emulator for determining decisions of protocol locally. */
 	protocol_emulator emulator;
 	/* Parameter for protocol emulator. */
@@ -72,10 +84,12 @@ struct protocol_suite {
 	double eta;
 	/* Slot information for last to be emulated. */
 	struct metamac_slot last_slot;
+	/* Indicates whether protocols should be cycled. */
+	uchar cycle : 1;
 };
 
 void free_protocol(struct protocol *proto);
-void init_protocol_suite(struct protocol_suite *suite, int num_protocols, double eta);
+void init_protocol_suite(struct protocol_suite *suite, int num_protocols, double eta,  metamac_flag_t metamac_flags);
 void free_protocol_suite(struct protocol_suite *suite);
 void update_weights(struct protocol_suite *suite, struct metamac_slot slot);
 void metamac_init(struct debugfs_file * df, struct protocol_suite *suite, metamac_flag_t flags);

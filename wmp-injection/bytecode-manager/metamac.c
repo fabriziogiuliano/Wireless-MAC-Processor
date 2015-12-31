@@ -5,11 +5,13 @@
 #include <unistd.h>
 #include <err.h>
 #include <stdint.h>
+#include <string.h>
 
 #include "metamac.h"
 #include "protocols.h"
 #include "vars.h"
 #include "dataParser.h"
+#include "bytecode-work.h"
 
 
 void free_protocol(struct protocol *proto)
@@ -52,7 +54,7 @@ void update_weights(struct protocol_suite* suite, struct metamac_slot current_sl
 	suite->last_slot = current_slot;
 }
 
-void init_protocol_suite(struct protocol_suite *suite, int num_protocols, double eta)
+void init_protocol_suite(struct protocol_suite *suite, int num_protocols, double eta, metamac_flag_t metamac_flags)
 {
 	suite->num_protocols = num_protocols;
 	suite->active_protocol = -1;
@@ -79,6 +81,7 @@ void init_protocol_suite(struct protocol_suite *suite, int num_protocols, double
 	suite->last_slot.packet_queued = 0;
 	suite->last_slot.transmitted = 0;
 	suite->last_slot.channel_busy = 0;
+	suite->cycle = (metamac_flags & FLAG_CYCLE) != 0;
 }
 
 void free_protocol_suite(struct protocol_suite *suite)
@@ -86,6 +89,14 @@ void free_protocol_suite(struct protocol_suite *suite)
 	free(suite->protocols);
 	free(suite->weights);
 	free(suite);
+}
+
+void configure_params(struct debugfs_file *df, int slot, struct fsm_param *param)
+{
+	while (param != NULL) {
+		set_parameter(df, slot, param->num, param->value);
+		param = param->next;
+	}
 }
 
 void metamac_init(struct debugfs_file * df, struct protocol_suite *suite, metamac_flag_t flags)
@@ -118,6 +129,10 @@ void metamac_init(struct debugfs_file * df, struct protocol_suite *suite, metama
 		opt.load = "1";
 		opt.name_file = suite->protocols[suite->active_protocol].fsm_path;
 		bytecodeSharedWrite(df, &opt);
+		configure_params(df, 0, suite->protocols[suite->active_protocol].fsm_params);
+
+		opt.active = opt.load;
+		writeAddressBytecode(df, &opt);
 
 		suite->slots[0] = suite->active_protocol;
 		suite->slots[1] = -1;
@@ -141,49 +156,73 @@ static void metamac_display(unsigned long loop, struct protocol_suite *suite)
 	}
 }
 
-static void metamac_switch(struct debugfs_file *df, struct protocol_suite *suite)
+static void load_protocol(struct debugfs_file *df, struct protocol_suite *suite, int protocol)
+{
+	struct options opt;
+	int active = suite->active_slot; // Always 0 or 1 since metamac_init will already have run.
+	int inactive = 1 - active;
+
+	if (protocol == suite->slots[active]) {
+		/* This protocol is already running. */
+
+	} else if (protocol == suite->slots[inactive]) {
+		/* Switch to other slot. */
+		opt.active = (inactive == 0) ? "1" : "2";
+		writeAddressBytecode(df, &opt);
+		suite->active_slot = inactive;
+
+	} else if (suite->slots[active] >= 0 &&
+			strcmp(suite->protocols[protocol].fsm_path,
+			suite->protocols[suite->slots[active]].fsm_path) == 0) {
+		/* Protocol in active slot shares same FSM, but is not the same protocol
+		(already checked). Write the parameters for this protocol. */
+		configure_params(df, active, suite->protocols[protocol].fsm_params);
+		suite->slots[active] = protocol;
+
+	} else if (suite->slots[inactive] >= 0 &&
+			strcmp(suite->protocols[protocol].fsm_path,
+			suite->protocols[suite->slots[inactive]].fsm_path) == 0) {
+		/* Protocol in inactive slot shares same FSM, but is not the same protocol,
+		so write the parameters for this protocol and activate it. */
+		configure_params(df, inactive, suite->protocols[protocol].fsm_params);
+		opt.active = (inactive == 0) ? "1" : "2";
+		writeAddressBytecode(df, &opt);
+		suite->slots[inactive] = protocol;
+		suite->active_slot = inactive;
+
+	} else {
+		/* Load into inactive slot. */
+		opt.load = (inactive == 0) ? "1" : "2";
+		opt.name_file = suite->protocols[protocol].fsm_path;
+		bytecodeSharedWrite(df, &opt);
+		configure_params(df, inactive, suite->protocols[protocol].fsm_params);
+		opt.active = opt.load;
+		writeAddressBytecode(df, &opt);
+
+		suite->slots[inactive] = protocol;
+		suite->active_slot = inactive;
+
+	}
+
+	suite->active_protocol = protocol;
+}
+
+static void metamac_evaluate(struct debugfs_file *df, struct protocol_suite *suite)
 {
 	/* Identify the best and second-best protocols. */
-	int best = 0, second = 0;
+	int best = 0;
 	for (int i = 0; i < suite->num_protocols; i++) {
 		if (suite->weights[i] > suite->weights[best]) {
-			second = best;
 			best = i;
 		}
 	}
 
+	if (suite->cycle) {
+		best = (suite->active_protocol + 1) % suite->num_protocols;
+	}
+
 	if (best != suite->active_protocol) {
-		/* Protocol switch necessitated. */
-		struct options opt;
-
-		if (best == suite->slots[0]) {
-			opt.active = "1";
-			writeAddressBytecode(df, &opt);
-			suite->active_slot = 0;
-
-		} else if (best == suite->slots[1]) {
-			opt.active = "2";
-			writeAddressBytecode(df, &opt);
-			suite->active_slot = 1;
-
-		} else if (second == suite->slots[0]) {
-			/* If second best protocol is already in slot 1, then load
-			best into slot 2. */
-			opt.load = "2";
-			opt.name_file = suite->protocols[best].fsm_path;
-			bytecodeSharedWrite(df, &opt);
-			suite->slots[1] = best;
-			suite->active_slot = 1;
-
-		} else {
-			opt.load = "1";
-			opt.name_file = suite->protocols[best].fsm_path;
-			bytecodeSharedWrite(df, &opt);
-			suite->slots[0] = best;
-			suite->active_slot = 0;
-		}
-
-		suite->active_protocol = best;
+		load_protocol(df, suite, best);
 	}
 }
 
@@ -224,7 +263,8 @@ int metamac_read_loop(struct metamac_queue *queue, struct debugfs_file *df,
 		uint transmit_other = shmRead16(df, B43_SHM_SHARED, OTHER_TRANSMISSION);
 		uint bad_reception = shmRead16(df, B43_SHM_SHARED, BAD_RECEPTION);
 		uint busy_slot = shmRead16(df, B43_SHM_SHARED, BUSY_SLOT);
-		uint channel_busy = (transmitted & ~transmit_success) | transmit_other | bad_reception | busy_slot;
+		uint channel_busy = (transmitted & ~transmit_success) | transmit_other | bad_reception |
+			(busy_slot & ~transmit_success);
 
 		int slots_passed = slot_index - last_slot_index;
 		slots_passed = slots_passed < 0 ? slots_passed + 8 : slots_passed;
@@ -378,7 +418,7 @@ int metamac_process_loop(struct metamac_queue *queue, struct debugfs_file *df,
 		/* Update running protocol and the console every 1 second. */
 		if (timediff > 1000000L) {
 			if (!(flags & FLAG_READONLY)) {
-				metamac_switch(df, suite);
+				metamac_evaluate(df, suite);
 			}
 
 			if (flags & FLAG_VERBOSE) {

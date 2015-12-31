@@ -3,6 +3,6 @@
 
 #include "metamac.h"
 
-struct protocol_suite *read_config(const char *program_name, const char *file_name);
+struct protocol_suite *read_config(const char *program_name, const char *file_name, metamac_flag_t metamac_flags);
 
 #endif // PARSE_CONFIG_H

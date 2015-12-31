@@ -21,6 +21,7 @@ static struct argp_option options[] = {
 	{ "verbose",  'v', 0,      0, "Verbose output." },
 	{ "logfile",  'l', "FILE", 0, "File to log MAC feedback for each slot." },
 	{ "readonly", 'r', 0,      0, "Do not update running protocol." },
+	{ "cycle",    'c', 0,      0, "Force cycling of protocols."},
 	{ 0 }
 };
 
@@ -48,6 +49,9 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state)
 	case 'r':
 		arguments->metamac_flags |= FLAG_READONLY;
 		break;
+
+	case 'c':
+		arguments->metamac_flags |= FLAG_CYCLE;
 
 	case ARGP_KEY_ARG:
 		if (state->arg_num >= 1)
@@ -117,7 +121,7 @@ int main(int argc, char *argv[])
 	memset(&arguments, 0, sizeof(arguments));
 	argp_parse(&argp, argc, argv, 0, 0, &arguments);
 
-	struct protocol_suite *suite = read_config(argv[0], arguments.config);
+	struct protocol_suite *suite = read_config(argv[0], arguments.config, arguments.metamac_flags);
 	struct thread_params *params = malloc(sizeof(struct thread_params));
 	if (!params) {
 		err(EXIT_FAILURE, "Unable to allocate memory");
