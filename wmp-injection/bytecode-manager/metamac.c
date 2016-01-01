@@ -244,6 +244,7 @@ int metamac_read_loop(struct metamac_queue *queue, struct debugfs_file *df,
 	getTSFRegs(df, &initial_tsf);
 	tsf = initial_tsf;
 	slot_index = shmRead16(df, B43_SHM_REGS, COUNT_SLOT) & 0x7;
+	slot_num = slot_index;
 
 	while (metamac_loop_break == 0) {
 

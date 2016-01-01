@@ -255,8 +255,10 @@ void read_fsm_params(xmlNode *fsm_node, struct fsm_param **link)
 
 		param->num = num;
 		param->value = value;
+		param->next = NULL;
 		*link = param;
 		link = &param->next;
+		param_node = param_node->next;
 	}
 }
 

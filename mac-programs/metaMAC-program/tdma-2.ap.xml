@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<metamac eta="0.25" initial-protocol="1">
+	<protocol id="1" name="TDMA (slot 0)">
+		<fsm path="tdma-4.ap.txt">
+			<param num="12" value="2"/>
+			<param num="11" value="0"/>
+		</fsm>
+		<emulator type="tdma">
+			<param key="frame_offset" value="0"/>
+			<param key="frame_length" value="2"/>
+			<param key="slot_assignment" value="0"/>
+		</emulator>
+	</protocol>
+	<protocol id="2" name="TDMA (slot 1)">
+		<fsm path="tdma-4.ap.txt">
+			<param num="12" value="2"/>
+			<param num="11" value="1"/>
+		</fsm>
+		<emulator type="tdma">
+			<param key="frame_offset" value="0"/>
+			<param key="frame_length" value="2"/>
+			<param key="slot_assignment" value="1"/>
+		</emulator>
+	</protocol>
+</metamac>
