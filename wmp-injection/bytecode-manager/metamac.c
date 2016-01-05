@@ -271,22 +271,24 @@ int metamac_read_loop(struct metamac_queue *queue, struct debugfs_file *df,
 		slots_passed = slots_passed < 0 ? slots_passed + 8 : slots_passed;
 		int64_t actual = ((int64_t)tsf) - ((int64_t)last_tsf);
 
-		if (actual < 0) {
+		if (actual <= 0 || actual > 200000) {
 			fprintf(stderr, "Received TSF difference of %lld between consecutive reads.\n", (long long)actual);
-			metamac_loop_break = 1; // Stop the process loop.
-			break;
-		}
 
-		int64_t min_diff = abs(actual - slots_passed * slot_time);
-		int64_t diff;
+			if (slots_passed == 0) {
+				slots_passed = 8;
+			}
+		} else {
+			int64_t min_diff = abs(actual - slots_passed * slot_time);
+			int64_t diff;
 
-		/* Suppose last_slot_index is 7 and slot_index is 5. Then, since the slot
-		is a value mod 8 we know the actual number of slots which have passed is
-		>= 6 and congruent to 6 mod 8. Using the TSF counter from the network card,
-		we find the most likely number of slots which have passed. */
-		while ((diff = abs(actual - (slots_passed + 8) * slot_time)) < min_diff) {
-			slots_passed += 8;
-			min_diff = diff;
+			/* Suppose last_slot_index is 7 and slot_index is 5. Then, since the slot
+			is a value mod 8 we know the actual number of slots which have passed is
+			>= 6 and congruent to 6 mod 8. Using the TSF counter from the network card,
+			we find the most likely number of slots which have passed. */
+			while ((diff = abs(actual - (slots_passed + 8) * slot_time)) < min_diff) {
+				slots_passed += 8;
+				min_diff = diff;
+			}
 		}
 
 		/* Because the reads are not atomic, the values for the slot after the one
