@@ -244,7 +244,7 @@ int metamac_read_loop(struct metamac_queue *queue, struct debugfs_file *df,
 	getTSFRegs(df, &initial_tsf);
 	tsf = initial_tsf;
 	slot_index = shmRead16(df, B43_SHM_REGS, COUNT_SLOT) & 0x7;
-	slot_num = slot_index;
+	slot_num = (slot_index + 1) % 8;
 
 	while (metamac_loop_break == 0) {
 
@@ -373,7 +373,11 @@ int metamac_process_loop(struct metamac_queue *queue, struct debugfs_file *df,
 			err(EXIT_FAILURE, "Unable to open log file");
 		}
 
-		fprintf(logfile, "slot_num,read_num,host_time,tsf_time,slot_index,slots_passed,filler,packet_queued,transmitted,transmit_success,transmit_other,bad_reception,busy_slot,channel_busy\n");
+		fprintf(logfile, "slot_num,read_num,host_time,tsf_time,slot_index,slots_passed,filler,packet_queued,transmitted,transmit_success,transmit_other,bad_reception,busy_slot,channel_busy,protocol");
+		for (int i = 0; i < suite->num_protocols; i++) {
+			fprintf(logfile, ",%s", suite->protocols[i].name);
+		}
+		fprintf(logfile, "\n");
 		printf("Logging to %s\n", logpath);
 	} else {
 		logfile = NULL;
@@ -390,8 +394,10 @@ int metamac_process_loop(struct metamac_queue *queue, struct debugfs_file *df,
 		size_t count = queue_multipop(queue, slots, ARRAY_SIZE(slots));
 
 		for (int i = 0; i < count; i++) {
+			update_weights(suite, slots[i]);
+
 			if (logfile != NULL) {
-				fprintf(logfile, "%llu,%llu,%llu,%llu,%d,%d,%01x,%01x,%01x,%01x,%01x,%01x,%01x,%01x\n",
+				fprintf(logfile, "%llu,%llu,%llu,%llu,%d,%d,%01x,%01x,%01x,%01x,%01x,%01x,%01x,%01x,%s",
 					(unsigned long long) slots[i].slot_num,
 					(unsigned long long) slots[i].read_num,
 					(unsigned long long) slots[i].host_time,
@@ -405,10 +411,15 @@ int metamac_process_loop(struct metamac_queue *queue, struct debugfs_file *df,
 					slots[i].transmit_other,
 					slots[i].bad_reception,
 					slots[i].busy_slot,
-					slots[i].channel_busy);
-			}
+					slots[i].channel_busy,
+					suite->protocols[suite->active_protocol].name);
 
-			update_weights(suite, slots[i]);
+				for (int i = 0; i < suite->num_protocols; i++) {
+					fprintf(logfile, ",%f", suite->weights[i]);
+				}
+
+				fprintf(logfile, "\n");
+			}
 
 		}
 
