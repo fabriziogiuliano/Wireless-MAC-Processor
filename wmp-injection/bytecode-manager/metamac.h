@@ -41,7 +41,7 @@ struct metamac_slot {
 	uchar channel_busy : 1;
 };
 
-typedef double (*protocol_emulator)(void *param, int slot_num, struct metamac_slot previous_slot);
+typedef double (*protocol_emulator)(void *param, int slot_num, int offset, struct metamac_slot previous_slot);
 
 struct fsm_param {
 	/* Parameter number. */
@@ -76,6 +76,8 @@ struct protocol_suite {
 	int slots[2];
 	/* Which slot is active. 0 indicates neither are active. */
 	int active_slot;
+	/* Offset of slots numbering from read loop to slot numbering for TDMA. */
+	int slot_offset;
 	/* Array of all protocols. */
 	struct protocol *protocols;
 	/* Array of weights corresponding to protocols. */

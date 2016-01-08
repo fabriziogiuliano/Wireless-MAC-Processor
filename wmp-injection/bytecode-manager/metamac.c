@@ -26,6 +26,21 @@ void free_protocol(struct protocol *proto)
 for a single slot, and adjusting the weights. */
 void update_weights(struct protocol_suite* suite, struct metamac_slot current_slot)
 {
+	/* Accounting for the fact that the slots that TDMA variants transmit on are
+	not necessarily aligned to the slot indices provided by the board. For instance,
+	one would expect that TDMA-4 slot 1 would transmit on slot indexes 1 and 5, but 
+	this is not necessarily true. Offset between transmissions will be 4, but not
+	necessarily aligned to the slot indexes. */
+	if (suite->protocols[suite->active_protocol].emulator == tdma_emulate &&
+		current_slot.transmitted) {
+		/* Update slot_offset. */
+
+		struct tdma_param *params = suite->protocols[suite->active_protocol].parameter;
+		int neg_offset = (current_slot.slot_num - params->frame_offset - params->slot_assignment) %
+			params->frame_length;
+		suite->slot_offset = (-neg_offset) + params->frame_length;
+	}
+
 	/* If there is no packet queued for this slot, consider all protocols to be correct
 	and thus the weights will not change. */
 	if (current_slot.packet_queued) {
@@ -36,7 +51,7 @@ void update_weights(struct protocol_suite* suite, struct metamac_slot current_sl
 		for (int p = 0; p < suite->num_protocols; ++p) {
 			/* d is the decision of this component protocol - between 0 and 1 */
 			double d = suite->protocols[p].emulator(suite->protocols[p].parameter, 
-				current_slot.slot_num, suite->last_slot);
+				current_slot.slot_num, suite->slot_offset, suite->last_slot);
 			suite->weights[p] *= exp(-(suite->eta) * fabs(d - z));
 		}
 
@@ -61,6 +76,7 @@ void init_protocol_suite(struct protocol_suite *suite, int num_protocols, double
 	suite->slots[0] = -1;
 	suite->slots[1] = -1;
 	suite->active_slot = -1;
+	suite->slot_offset = 0;
 
 	suite->protocols = (struct protocol*)calloc(num_protocols, sizeof(struct protocol));
 	if (suite->protocols == NULL) {
@@ -299,24 +315,7 @@ int metamac_read_loop(struct metamac_queue *queue, struct debugfs_file *df,
 		slot is at an offset of -6 relative to the current slot, hence the -1. */
 		int slot_offset = slots_passed - 1;
 		for (; slot_offset > 6; slot_offset--) {
-			struct metamac_slot slot = {
-				.slot_num = slot_num++,
-				.read_num = read_num,
-				.host_time = loop_start,
-				.tsf_time = tsf - initial_tsf,
-				.slot_index = slot_index,
-				.slots_passed = slots_passed,
-				.filler = 1,
-				.packet_queued = 0,
-				.transmitted = 0,
-				.transmit_success = 0,
-				.transmit_other = 0,
-				.bad_reception = 0,
-				.busy_slot = 0,
-				.channel_busy = 0
-			};
-
-			queue_multipush(queue, &slot, 1);
+			slot_num++;
 		}
 
 		struct metamac_slot slots[8];
@@ -373,7 +372,7 @@ int metamac_process_loop(struct metamac_queue *queue, struct debugfs_file *df,
 			err(EXIT_FAILURE, "Unable to open log file");
 		}
 
-		fprintf(logfile, "slot_num,read_num,host_time,tsf_time,slot_index,slots_passed,filler,packet_queued,transmitted,transmit_success,transmit_other,bad_reception,busy_slot,channel_busy,protocol");
+		fprintf(logfile, "slot_num,offset,read_num,host_time,tsf_time,slot_index,slots_passed,filler,packet_queued,transmitted,transmit_success,transmit_other,bad_reception,busy_slot,channel_busy,protocol");
 		for (int i = 0; i < suite->num_protocols; i++) {
 			fprintf(logfile, ",%s", suite->protocols[i].name);
 		}
@@ -397,8 +396,9 @@ int metamac_process_loop(struct metamac_queue *queue, struct debugfs_file *df,
 			update_weights(suite, slots[i]);
 
 			if (logfile != NULL) {
-				fprintf(logfile, "%llu,%llu,%llu,%llu,%d,%d,%01x,%01x,%01x,%01x,%01x,%01x,%01x,%01x,%s",
+				fprintf(logfile, "%llu,%d,%llu,%llu,%llu,%d,%d,%01x,%01x,%01x,%01x,%01x,%01x,%01x,%01x,%s",
 					(unsigned long long) slots[i].slot_num,
+					suite->slot_offset,
 					(unsigned long long) slots[i].read_num,
 					(unsigned long long) slots[i].host_time,
 					(unsigned long long) slots[i].tsf_time,
