@@ -48,8 +48,20 @@ def load_b43():
         pass
 
 @fab.task
-@fab.parallel
+@fab.runs_once
 def setup(branch='metamac', firmware_branch=None, debug=False):
+    fab.local('mkdir -p cache')
+    with fab.lcd('cache'):
+        fab.local('wget http://security.ubuntu.com/ubuntu/pool/main/libx/libxml2/libxml2_2.9.1+dfsg1-3ubuntu4.6_i386.deb')
+        fab.local('wget http://security.ubuntu.com/ubuntu/pool/main/libx/libxml2/libxml2-dev_2.9.1+dfsg1-3ubuntu4.6_i386.deb')
+        fab.local('wget github.com/nflick/wireless-mac-processor/archive/{0}.zip'.format(branch))
+        if firmware_branch is not None and firmware_branch != branch:
+            fab.local('wget github.com/nflick/wireless-mac-processor/archive/{0}.zip'.format(firmware_branch))
+    fab.execute(setup_remote, branch, firmware_branch, debug)
+
+@fab.task
+@fab.parallel
+def setup_remote(branch='metamac', firmware_branch=None, debug=False):
     '''Sets up the node by downloading the specified branch or commit and extracting necessary
     files, installing the WMP firmware, and building needed tools.
     '''
@@ -57,22 +69,21 @@ def setup(branch='metamac', firmware_branch=None, debug=False):
     if firmware_branch is None:
         firmware_branch = branch
 
-    with fab.cd('/tmp'):
-        fab.run('rm -f *.deb')
-        fab.run('wget http://security.ubuntu.com/ubuntu/pool/main/libx/libxml2/libxml2_2.9.1+dfsg1-3ubuntu4.6_i386.deb')
-        fab.run('wget http://security.ubuntu.com/ubuntu/pool/main/libx/libxml2/libxml2-dev_2.9.1+dfsg1-3ubuntu4.6_i386.deb')
-        fab.run('dpkg -i *.deb')
-        fab.run('rm -f *.deb')
+    fab.run('rm -f *.deb')
+    fab.put(local_path='cache/libxml2_2.9.1+dfsg1-3ubuntu4.6_i386.deb', remote_path='.')
+    fab.put(local_path='cache/libxml2-dev_2.9.1+dfsg1-3ubuntu4.6_i386.deb', remote_path='.')
+    fab.run('dpkg -i *.deb')
+    fab.run('rm -f *.deb')
 
     fab.run('rm -rf metamac && mkdir metamac')
     with fab.cd('metamac'):
-        fab.run('wget github.com/nflick/wireless-mac-processor/archive/{0}.zip'.format(branch))
+        fab.put(local_path='cache/{0}.zip'.format(branch), remote_path='.')
         fab.run('unzip {0}.zip "wireless-mac-processor-{0}/wmp-injection/bytecode-manager/*"'.format(branch))
         fab.run('unzip {0}.zip "wireless-mac-processor-{0}/mac-programs/metaMAC-program/*"'.format(branch))
 
         if firmware_branch != branch:
             fab.run('rm {0}.zip'.format(branch))
-            fab.run('wget github.com/nflick/wireless-mac-processor/archive/{0}.zip'.format(firmware_branch))
+            fab.put(local_path='cache/{0}.zip'.format(firmware_branch), remote_path='.')
 
         fab.run('unzip {0}.zip "wireless-mac-processor-{0}/wmp-engine/broadcom-metaMAC/*"'.format(firmware_branch))
         fab.run('rm {0}.zip'.format(firmware_branch))
@@ -87,8 +98,8 @@ def setup(branch='metamac', firmware_branch=None, debug=False):
 
     with fab.cd('~/metamac/wireless-mac-processor-{0}/wmp-injection/bytecode-manager/'.format(branch)):
         if debug:
-            fab.run("sed -i 's/CFLAGS=/CFLAGS=-g /' Makefile")
-            fab.run("sed -i 's/-O[0-9]/ /' Makefile")
+            fab.run("sed -i 's/CFLAGS=/CFLAGS=-g /' Makefile") # Add -g flag to Makefile
+            fab.run("sed -i 's/-O[0-9]/ /' Makefile")          # Remove optimization flag from Makefile
         fab.run('make bytecode-manager')
         fab.run('make metamac')
         fab.run('make tsfrecorder')
