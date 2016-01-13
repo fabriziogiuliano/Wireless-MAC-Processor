@@ -315,9 +315,9 @@ void read_protocol(struct protocol *proto, xmlNode *protocol_node, const char *f
 	xmlFree(type);
 }
 
-struct protocol_suite *read_config(const char *program_name, const char *file_name, metamac_flag_t metamac_flags)
+struct protocol_suite *read_config(const char *program_name, struct arguments *arguments)
 {
-	xmlDoc *doc = xmlParseFile(file_name);
+	xmlDoc *doc = xmlParseFile(arguments->config);
 	if (!doc) {
 		errx(EXIT_FAILURE, "Invalid configuration file.\n");
 	}
@@ -327,16 +327,20 @@ struct protocol_suite *read_config(const char *program_name, const char *file_na
 		errx(EXIT_FAILURE, "Invalid configuration file: %s\n", "Root node should be <metamac>.");
 	}
 
-	/* eta is a required attribute */
-	char* eta_str = (char*)xmlGetProp(metamac_node, (xmlChar*)"eta");
-	if (!eta_str) {
-		errx(EXIT_FAILURE, "Invalid configuration file: %s\n", "Missing \"eta\" attribute on <metamac> node.");
-	}
 	double eta;
-	if (sscanf(eta_str, "%lf", &eta) < 1) {
-		errx(EXIT_FAILURE, "Invalid configuration file: Invalid eta value \"%s\".\n", eta_str);
+	if (arguments->metamac_flags & FLAG_ETA_OVERRIDE) {
+		eta = arguments->eta;
+	} else {
+		/* eta is a required attribute */
+		char* eta_str = (char*)xmlGetProp(metamac_node, (xmlChar*)"eta");
+		if (!eta_str) {
+			errx(EXIT_FAILURE, "Invalid configuration file: %s\n", "Missing \"eta\" attribute on <metamac> node.");
+		}
+		if (sscanf(eta_str, "%lf", &eta) < 1 || eta <= 0.0) {
+			errx(EXIT_FAILURE, "Invalid configuration file: Invalid eta value \"%s\".\n", eta_str);
+		}
+		xmlFree(eta_str);
 	}
-	xmlFree(eta_str);
 
 	/* initial-protocol is optional */
 	char *initial_str = (char*)xmlGetProp(metamac_node, (xmlChar*)"initial-protocol");
@@ -360,18 +364,18 @@ struct protocol_suite *read_config(const char *program_name, const char *file_na
 		err(EXIT_FAILURE, "Unable to allocate memory");
 	}
 
-	init_protocol_suite(suite, num_protocols, eta, metamac_flags);
+	init_protocol_suite(suite, num_protocols, eta, arguments->metamac_flags);
 
 	int prefix_len;
-	for (prefix_len = strlen(file_name) - 1; prefix_len >= 0; prefix_len--) {
-		if (file_name[prefix_len] == '/') {
+	for (prefix_len = strlen(arguments->config) - 1; prefix_len >= 0; prefix_len--) {
+		if (arguments->config[prefix_len] == '/') {
 			prefix_len++;
 			break;
 		}
 	}
 
 	char *fsm_basepath = alloca(prefix_len + 1);
-	memcpy(fsm_basepath, file_name, prefix_len);
+	memcpy(fsm_basepath, arguments->config, prefix_len);
 	fsm_basepath[prefix_len] = '\0';
 
 	xmlNode *protocol_node = metamac_node->children;

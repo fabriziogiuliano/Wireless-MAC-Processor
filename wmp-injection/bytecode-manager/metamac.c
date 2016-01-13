@@ -38,7 +38,7 @@ void update_weights(struct protocol_suite* suite, struct metamac_slot current_sl
 		struct tdma_param *params = suite->protocols[suite->active_protocol].parameter;
 		int neg_offset = (current_slot.slot_num - params->frame_offset - params->slot_assignment) %
 			params->frame_length;
-		suite->slot_offset = (-neg_offset) + params->frame_length;
+		suite->slot_offset = (params->frame_length - neg_offset) % params->frame_length;
 	}
 
 	/* If there is no packet queued for this slot, consider all protocols to be correct
@@ -154,6 +154,8 @@ void metamac_init(struct debugfs_file * df, struct protocol_suite *suite, metama
 		suite->slots[1] = -1;
 		suite->active_slot = 0;
 	}
+
+	clock_gettime(CLOCK_MONOTONIC_RAW, &suite->last_update);
 }
 
 static void metamac_display(unsigned long loop, struct protocol_suite *suite)
@@ -221,11 +223,12 @@ static void load_protocol(struct debugfs_file *df, struct protocol_suite *suite,
 	}
 
 	suite->active_protocol = protocol;
+	clock_gettime(CLOCK_MONOTONIC_RAW, &suite->last_update);
 }
 
 static void metamac_evaluate(struct debugfs_file *df, struct protocol_suite *suite)
 {
-	/* Identify the best and second-best protocols. */
+	/* Identify the best protocol. */
 	int best = 0;
 	for (int i = 0; i < suite->num_protocols; i++) {
 		if (suite->weights[i] > suite->weights[best]) {
@@ -234,10 +237,15 @@ static void metamac_evaluate(struct debugfs_file *df, struct protocol_suite *sui
 	}
 
 	if (suite->cycle) {
-		best = (suite->active_protocol + 1) % suite->num_protocols;
-	}
+		struct timespec current_time;
+		clock_gettime(CLOCK_MONOTONIC_RAW, &current_time);
+		uint64_t timediff = (current_time.tv_sec - suite->last_update.tv_sec) * 1000000L +
+			(current_time.tv_nsec - suite->last_update.tv_nsec) / 1000L;
 
-	if (best != suite->active_protocol) {
+		if (timediff > 1000000L) {
+			load_protocol(df, suite, (suite->active_protocol + 1) % suite->num_protocols);
+		}
+	} else if (best != suite->active_protocol) {
 		load_protocol(df, suite, best);
 	}
 }
@@ -415,7 +423,7 @@ int metamac_process_loop(struct metamac_queue *queue, struct debugfs_file *df,
 					suite->protocols[suite->active_protocol].name);
 
 				for (int i = 0; i < suite->num_protocols; i++) {
-					fprintf(logfile, ",%f", suite->weights[i]);
+					fprintf(logfile, ",%e", suite->weights[i]);
 				}
 
 				fprintf(logfile, "\n");
@@ -429,12 +437,13 @@ int metamac_process_loop(struct metamac_queue *queue, struct debugfs_file *df,
 		unsigned long timediff = (current_time.tv_sec - last_update_time.tv_sec) * 1000000L
 			+ (current_time.tv_nsec - last_update_time.tv_nsec) / 1000L;
 
-		/* Update running protocol and the console every 1 second. */
-		if (timediff > 1000000L) {
-			if (!(flags & FLAG_READONLY)) {
-				metamac_evaluate(df, suite);
-			}
+		/* Update running protocol. */
+		if (!(flags & FLAG_READONLY)) {
+			metamac_evaluate(df, suite);
+		}
 
+		/* Update display every 1 second. */
+		if (timediff > 1000000L) {
 			if (flags & FLAG_VERBOSE) {
 				metamac_display(loop++, suite);
 			}

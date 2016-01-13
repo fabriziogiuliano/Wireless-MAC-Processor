@@ -22,14 +22,8 @@ static struct argp_option options[] = {
 	{ "logfile",  'l', "FILE", 0, "File to log MAC feedback for each slot." },
 	{ "readonly", 'r', 0,      0, "Do not update running protocol." },
 	{ "cycle",    'c', 0,      0, "Force cycling of protocols."},
+	{ "eta",      'e', "ETA",  0, "Learning constant eta (>= 0)."},
 	{ 0 }
-};
-
-struct arguments {
-	char *config;
-	char *fsm_basepath;
-	char *logpath;
-	metamac_flag_t metamac_flags;
 };
 
 static error_t parse_opt(int key, char *arg, struct argp_state *state)
@@ -53,9 +47,16 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state)
 	case 'c':
 		arguments->metamac_flags |= FLAG_CYCLE;
 
-	case ARGP_KEY_ARG:
-		if (state->arg_num >= 1)
+	case 'e':
+		if (sscanf(arg, "%lf", &arguments->eta) < 1 || arguments->eta <= 0.0) {
 			argp_usage(state);
+		}
+		arguments->metamac_flags |= FLAG_ETA_OVERRIDE;
+
+	case ARGP_KEY_ARG:
+		if (state->arg_num >= 1) {
+			argp_usage(state);
+		}
 
 		switch (state->arg_num) {
 		case 0:
@@ -67,8 +68,9 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state)
 
 		break;
 	case ARGP_KEY_END:
-		if (state->arg_num < 1)
+		if (state->arg_num < 1) {
 			argp_usage(state);
+		}
 		break;
 	default:
 		return ARGP_ERR_UNKNOWN;
@@ -121,7 +123,7 @@ int main(int argc, char *argv[])
 	memset(&arguments, 0, sizeof(arguments));
 	argp_parse(&argp, argc, argv, 0, 0, &arguments);
 
-	struct protocol_suite *suite = read_config(argv[0], arguments.config, arguments.metamac_flags);
+	struct protocol_suite *suite = read_config(argv[0], &arguments);
 	struct thread_params *params = malloc(sizeof(struct thread_params));
 	if (!params) {
 		err(EXIT_FAILURE, "Unable to allocate memory");

@@ -12,7 +12,8 @@ typedef enum {
 	FLAG_VERBOSE = 1,
 	FLAG_LOGGING = 2,
 	FLAG_READONLY = 4,
-	FLAG_CYCLE = 8
+	FLAG_CYCLE = 8,
+	FLAG_ETA_OVERRIDE = 16
 } metamac_flag_t;
 
 struct metamac_slot {
@@ -86,6 +87,8 @@ struct protocol_suite {
 	double eta;
 	/* Slot information for last to be emulated. */
 	struct metamac_slot last_slot;
+	/* Time of last protocol update. */
+	struct timespec last_update;
 	/* Indicates whether protocols should be cycled. */
 	uchar cycle : 1;
 };
