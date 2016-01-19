@@ -1,5 +1,5 @@
 <?xml version="1.0"?>
-<metamac eta="0.25" initial-protocol="1">
+<metamac eta="1.0" initial-protocol="1">
 	<protocol id="1" name="TDMA (slot 0)">
 		<fsm path="tdma-4.txt">
 			<param num="12" value="2"/>

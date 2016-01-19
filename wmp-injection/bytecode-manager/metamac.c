@@ -336,7 +336,7 @@ int metamac_read_loop(struct metamac_queue *queue, struct debugfs_file *df,
 			slots[ai].slot_num = slot_num++;
 			slots[ai].read_num = read_num;
 			slots[ai].host_time = loop_start;
-			slots[ai].tsf_time = tsf - initial_tsf;
+			slots[ai].tsf_time = tsf;
 			slots[ai].slot_index = slot_index;
 			slots[ai].slots_passed = slots_passed;
 			slots[ai].filler = 0;
