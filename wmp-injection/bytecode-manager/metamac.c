@@ -264,6 +264,7 @@ int metamac_read_loop(struct metamac_queue *queue, struct debugfs_file *df,
 
 	struct timespec start_time;
 	clock_gettime(CLOCK_MONOTONIC_RAW, &start_time);
+	uint64_t loop_end = 0L;
 
 	getTSFRegs(df, &initial_tsf);
 	tsf = initial_tsf;
@@ -288,6 +289,8 @@ int metamac_read_loop(struct metamac_queue *queue, struct debugfs_file *df,
 		uint transmit_other = shmRead16(df, B43_SHM_SHARED, OTHER_TRANSMISSION);
 		uint bad_reception = shmRead16(df, B43_SHM_SHARED, BAD_RECEPTION);
 		uint busy_slot = shmRead16(df, B43_SHM_SHARED, BUSY_SLOT);
+		int end_slot_index = shmRead16(df, B43_SHM_REGS, COUNT_SLOT) & 0x7;
+
 		uint channel_busy = (transmitted & ~transmit_success) | transmit_other | bad_reception |
 			(busy_slot & ~transmit_success);
 
@@ -295,41 +298,42 @@ int metamac_read_loop(struct metamac_queue *queue, struct debugfs_file *df,
 		slots_passed = slots_passed < 0 ? slots_passed + 8 : slots_passed;
 		int64_t actual = ((int64_t)tsf) - ((int64_t)last_tsf);
 
-		if (actual <= 0 || actual > 200000) {
+		if (actual < 0 || actual > 200000) {
 			fprintf(stderr, "Received TSF difference of %lld between consecutive reads.\n", (long long)actual);
-
-			if (slots_passed == 0) {
-				slots_passed = 8;
-			}
-		} else {
-			int64_t min_diff = abs(actual - slots_passed * slot_time);
-			int64_t diff;
-
-			/* Suppose last_slot_index is 7 and slot_index is 5. Then, since the slot
-			is a value mod 8 we know the actual number of slots which have passed is
-			>= 6 and congruent to 6 mod 8. Using the TSF counter from the network card,
-			we find the most likely number of slots which have passed. */
-			while ((diff = abs(actual - (slots_passed + 8) * slot_time)) < min_diff) {
-				slots_passed += 8;
-				min_diff = diff;
-			}
+			/* Unresolved bug with hardware/firmware/kernel driver causes occasional large jumps
+			in the TSF counter value. In this situation use time from the OS timer instead. */
+			actual = ((int64_t)loop_start) - ((int64_t)loop_end);
 		}
 
-		/* Because the reads are not atomic, the values for the slot after the one
+		int64_t min_diff = abs(actual - slots_passed * slot_time);
+		int64_t diff;
+
+		/* Suppose last_slot_index is 7 and slot_index is 5. Then, since the slot
+		is a value mod 8 we know the actual number of slots which have passed is
+		>= 6 and congruent to 6 mod 8. Using the TSF counter from the network card,
+		we find the most likely number of slots which have passed. */
+		while ((diff = abs(actual - (slots_passed + 8) * slot_time)) < min_diff) {
+			slots_passed += 8;
+			min_diff = diff;
+		}
+
+		/* Because the reads are not atomic, the values for the slot
 		indicated by slot_index are effectively unstable and could change between
 		the reads for the different feedback variables. Thus, only the last 7 slots
 		can be considered valid. If more than 7 slots have passed, we have to inject
 		empty slots to maintain the synchronization. Note that the 7th most recent
 		slot is at an offset of -6 relative to the current slot, hence the -1. */
-		int slot_offset = slots_passed - 1;
-		for (; slot_offset > 6; slot_offset--) {
+		int slot_offset = slots_passed;
+		int max_read_offset = (slot_index <= end_slot_index) ? slot_index - end_slot_index + 7 : slot_index - end_slot_index - 1;
+		for (; slot_offset > max_read_offset; slot_offset--) {
+			/* Empty filler slot. */
 			slot_num++;
 		}
 
 		struct metamac_slot slots[8];
 		int ai = 0;
 
-		for (; slot_offset >= 0; slot_offset--) {
+		for (; slot_offset > 0; slot_offset--) {
 			int si = slot_index - slot_offset;
 			si = si < 0 ? si + 8 : si;
 
@@ -353,7 +357,7 @@ int metamac_read_loop(struct metamac_queue *queue, struct debugfs_file *df,
 		queue_multipush(queue, slots, ai);
 
 		clock_gettime(CLOCK_MONOTONIC_RAW, &current_time);
-		uint64_t loop_end = (current_time.tv_sec - start_time.tv_sec) * 1000000L +
+		loop_end = (current_time.tv_sec - start_time.tv_sec) * 1000000L +
 			(current_time.tv_nsec - start_time.tv_nsec) / 1000L;
 
 		int64_t delay = ((int64_t)loop_start) + read_interval - ((int64_t)loop_end);
