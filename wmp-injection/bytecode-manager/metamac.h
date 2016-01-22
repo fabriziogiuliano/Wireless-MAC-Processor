@@ -13,7 +13,8 @@ typedef enum {
 	FLAG_LOGGING = 2,
 	FLAG_READONLY = 4,
 	FLAG_CYCLE = 8,
-	FLAG_ETA_OVERRIDE = 16
+	FLAG_ETA_OVERRIDE = 16,
+	FLAG_USE_BUSY = 32
 } metamac_flag_t;
 
 struct metamac_slot {

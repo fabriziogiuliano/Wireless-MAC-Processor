@@ -23,6 +23,7 @@ static struct argp_option options[] = {
 	{ "readonly", 'r', 0,      0, "Do not update running protocol." },
 	{ "cycle",    'c', 0,      0, "Force cycling of protocols."},
 	{ "eta",      'e', "ETA",  0, "Learning constant eta (>= 0)."},
+	{ "usebusy",  'b', 0,      0, "Use the busy slot feedback."},
 	{ 0 }
 };
 
@@ -46,12 +47,18 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state)
 
 	case 'c':
 		arguments->metamac_flags |= FLAG_CYCLE;
+		break;
 
 	case 'e':
 		if (sscanf(arg, "%lf", &arguments->eta) < 1 || arguments->eta <= 0.0) {
 			argp_usage(state);
 		}
 		arguments->metamac_flags |= FLAG_ETA_OVERRIDE;
+		break;
+
+	case 'b':
+		arguments->metamac_flags |= FLAG_USE_BUSY;
+		break;
 
 	case ARGP_KEY_ARG:
 		if (state->arg_num >= 1) {
@@ -105,7 +112,7 @@ static void *run_read_loop(void *arg)
 	and the priority to 98 (second highest). */
 	struct sched_param param = { .sched_priority = 98 };
 	pthread_setschedparam(pthread_self(), SCHED_FIFO, &param);
-	metamac_read_loop(&params->queue, &params->df, params->flags, 2200, 8800);
+	metamac_read_loop(&params->queue, &params->df, params->flags, 2200, 8000);
 
 	return (void*)NULL;
 }
