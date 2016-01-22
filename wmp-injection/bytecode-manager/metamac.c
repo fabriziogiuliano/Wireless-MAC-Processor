@@ -291,8 +291,8 @@ int metamac_read_loop(struct metamac_queue *queue, struct debugfs_file *df,
 		uint busy_slot = shmRead16(df, B43_SHM_SHARED, BUSY_SLOT);
 		int end_slot_index = shmRead16(df, B43_SHM_REGS, COUNT_SLOT) & 0x7;
 
-		uint channel_busy = (transmitted & ~transmit_success) | transmit_other | bad_reception |
-			(busy_slot & ~transmit_success);
+		uint channel_busy = (transmitted & ~transmit_success) |
+			((transmit_other | bad_reception | busy_slot) & ~(transmitted & transmit_success));
 
 		int slots_passed = slot_index - last_slot_index;
 		slots_passed = slots_passed < 0 ? slots_passed + 8 : slots_passed;
