@@ -6,11 +6,12 @@ Author: Nathan Flick
 import csv
 from math import *
 import re
+from glob import glob
 
 import numpy as np
 import matplotlib.pyplot as plt
 
-def try_parse_value(s):
+def parse_value(s):
     try:
         return int(s)
     except ValueError:
@@ -19,10 +20,154 @@ def try_parse_value(s):
         except ValueError:
             return s
 
-def load_log(path):
-    with open(path) as f:
-        reader = csv.DictReader(f)
-        return [{k: try_parse_value(v) for k, v in r.items()} for r in reader if None not in r.values()]
+class Log:
+    def __init__(self, path, slot_time=2200, tsf_threshold=200000):
+        self.path = path
+        self.time_offset = 0.0
+        self.slot_offset = 0
+        m = re.search(r'alix\d+', path)
+        if m:
+            self.node = m.group()
+        else:
+            self.node = 'unknown'
+        with open(path) as f:
+            self.header = f.readline().strip().split(',')
+            f.seek(0)
+            reader = csv.DictReader(f)
+            self.entries = [{k: parse_value(v) for k, v in r.items()} for r in reader if None not in r.values()]
+        self.protocols = self.header[self.header.index('protocol')+1:]
+
+        self.first_jump = None
+        self.tsf_segments = []
+        if len(self.entries) > 0:
+            current_segment = [self.entries[0]["tsf_time"]]
+            prev = current_segment[0]
+            for i, entry in enumerate(self.entries):
+                if abs(entry["tsf_time"] - prev) > tsf_threshold:
+                    if self.first_jump is None:
+                        self.first_jump = i
+                    self.tsf_segments.append(current_segment)
+                    current_segment = []
+                if entry["tsf_time"] != prev:
+                    current_segment.append(entry["tsf_time"])
+                    prev = entry["tsf_time"]
+            self.tsf_segments.append(current_segment)
+            self.tsf_jumps = len(self.tsf_segments) > 1
+        else:
+            self.tsf_jumps = False
+
+        current_read = self.entries[0]["read_num"]
+        for i in range(len(self.entries)):
+            if self.entries[i]["read_num"] != current_read:
+                j = i - 1
+                while j >= 0 and self.entries[j]["read_num"] == current_read:
+                    self.entries[j]["tsf_interp"] = self.entries[j]["tsf_time"] - slot_time * (i - j - 1)
+                    j -= 1
+                current_read = self.entries[i]["read_num"]
+        j = len(self.entries) - 1
+        while j >= 0 and self.entries[j]["read_num"] == current_read:
+            self.entries[j]["tsf_interp"] = self.entries[j]["tsf_time"] - slot_time * (len(self.entries) - j - 1)
+            j -= 1
+
+    def print_tsf_segments(self):
+        for segment in self.tsf_segments:
+            if len(segment) == 1:
+                print(segment[0])
+            elif len(segment) == 2:
+                print(segment[0])
+                print(segment[1])
+            else:
+                print(segment[0])
+                print('...')
+                print(segment[-1])
+
+    def slot_num(self, num, hi=None):
+        if hi is None:
+            hi = len(self.entries) - 1
+        lo = 0
+        while lo < hi:
+            mid = (lo + hi) >> 1
+            if self.entries[mid]["slot_num"] < num:
+                lo = mid + 1
+            else:
+                hi = mid
+        if lo == hi and self.entries[lo]["slot_num"] == num:
+            return self.entries[lo]
+        return None
+
+class Experiment:
+    def __init__(self, globpattern, access_point=None, slot_time=2200, tsf_threshold=200000):
+        self.access_point = access_point
+        self.slot_time = slot_time
+        self.logs = [Log(p, slot_time=slot_time, tsf_threshold=tsf_threshold) for p in glob(globpattern)]
+        if len(self.logs) == 0:
+            raise Exception('No logs found')
+        self.tsf_jumps = False
+        for log in self.logs:
+            self.tsf_jumps |= log.tsf_jumps
+
+        if self.access_point is None:
+            baseline = self.logs[0]
+        else:
+            baseline = next(l for l in self.logs if l.node == self.access_point)
+
+        for log in self.logs:
+            total = 0.0
+            count = 0
+            for entry in baseline.entries[:baseline.first_jump]:
+                slot = log.slot_num(entry["slot_num"], log.first_jump - 1)
+                if slot is not None:
+                    total += slot["tsf_interp"] - entry["tsf_interp"]
+                    count += 1
+            log.time_offset = total / count
+            log.slot_offset = int(round(log.time_offset / slot_time))
+
+    def tdma_assign_for_slot(self, slot):
+        m = re.match(r'TDMA \(slot (\d+)\)', slot['protocol'])
+        if not m:
+            raise Exception('Unexpected naming convention for TDMA protocol.')
+        proto = m.group(1)
+        return int(proto)
+
+    def plot_tdma(self, modulo=None, slot_time=2200, all_xmit=False):
+        if modulo is None:
+            modulo = len(self.logs)
+        if self.tsf_jumps:
+            print("TSF jump behavior present!")
+        #for log in logs:
+        #    interpolate_tsf(log)
+        symbols = ["bo", "ro", "go", "yo"]
+        assert(len(symbols) >= len(self.logs))
+
+        x_max = 0.0
+        fig = plt.figure()
+        ax = plt.subplot(111)
+        for i, log in enumerate(self.logs):
+            nudge = .5 * (i + 1) / (len(self.logs) + 1)
+            x = [(r["slot_num"] + log.slot_offset) * (self.slot_time * 1e-6) for r in log.entries if r["transmitted"] == 1 and (all_xmit or r["transmit_success"] == 1)]
+            y = [((r["slot_num"] + log.slot_offset) % modulo) - .25 + nudge for r in log.entries if r["transmitted"] == 1 and (all_xmit or r["transmit_success"] == 1)]
+            ax.plot(x, y, symbols[i], label=log.node)
+            if len(x) > 0:
+                x_max = max(x_max, max(x))
+
+        box = ax.get_position()
+        ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+        ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+        ax.axis([0.0, x_max + 1.0, -1, modulo])
+        plt.show()
+
+def count(logs, *predicates):
+    count = 0
+    for log in logs:
+        for entry in log:
+            satisfies = True
+            for predicate in predicates:
+                if entry[predicate] != 1:
+                    satisfies = False
+                    break
+            if satisfies:
+                count += 1
+    return count
 
 def invalid_offsets(log, modulo):
     slots = []
@@ -56,109 +201,3 @@ def run_invalid_slot_nums(path, modulo):
     log = load_log(path)
     return invalid_slot_nums(log, modulo)
 
-def node_for_path(path):
-    m = re.search(r'\d{4}-\d{2}-\d{2}-([a-zA-Z0-9]+)(?:-|\.)\d+\.csv', path)
-    if m is None:
-        raise Exception("Unexpected log naming convention.")
-    return m.group(1)
-
-def plot_tdma(*paths, offsets=None, modulo=4, slot_time=2200):
-    logs = [load_log(path) for path in paths]
-    if offsets is None:
-        offsets = find_offsets(*logs)
-        print("Offsets are {0}".format(offsets))
-
-    symbols = ["bo", "ro", "go", "yo"]
-    assert(len(symbols) >= len(paths))
-
-    x_max = 0.0
-    for i, path in enumerate(paths):
-        x = [(r["slot_num"] + offsets[i]) * (slot_time / 1e6) for r in logs[i] if r["transmitted"] == 1 and r["transmit_success"] == 1]
-        y = [(r["slot_num"] + offsets[i]) % modulo for r in logs[i] if r["transmitted"] == 1 and r["transmit_success"] == 1]
-        plt.plot(x, y, symbols[i], label=node_for_path(path))
-        if len(x) > 0:
-            x_max = max(x_max, max(x))
-
-    plt.legend()
-    plt.axis([0.0, x_max + 1.0, -1, modulo])
-    plt.show()
-
-class TSFSeries:
-    def __init__(self, log, threshold=100000):
-        self.series = []
-        if len(log) == 0:
-            return
-        current_series = []
-        prev = log[0]["tsf_time"]
-        for entry in log:
-            if abs(entry["tsf_time"] - prev) > threshold:
-                self.series.append(current_series)
-                current_series = []
-            if entry["tsf_time"] != prev:
-                current_series.append(entry["tsf_time"])
-                prev = entry["tsf_time"]
-        self.series.append(current_series)
-
-    def __str__(self):
-        entries = []
-        for series in self.series:
-            if len(series) == 1:
-                entries.append(str(series[0]))
-            elif len(series) == 2:
-                entries.append(str(series[0]))
-                entries.append(str(series[1]))
-            else:
-                entries.append(str(series[0]))
-                entries.append('...')
-                entries.append(str(series[-1]))
-        return '\n'.join(entries)
-
-def map_slots_to_tsf(log, slot_time=2200, threshold=100000):
-    '''TSF counter is read only every 5-7 slots, depending on timing. This function maps slot
-    numbers to interpolated TSF counter values.
-    '''
-    slots = {}
-    current_read = log[0]["read_num"]
-    for i in range(len(log)):
-        if log[i]["read_num"] != current_read:
-            j = i - 1
-            while j >= 0 and log[j]["read_num"] == current_read:
-                slots[log[j]["slot_num"]] = log[j]["tsf_time"] - slot_time * (i - j - 1)
-                j -= 1
-            if abs(log[i]["tsf_time"] - log[i-1]["tsf_time"]) > threshold:
-                return slots
-            current_read = log[i]["read_num"]
-    return slots
-
-
-def find_offsets(*logs, slot_time=2200):
-    '''Determines the average offset in TSF counter values between equal slots in two different
-    log files, divides by the slot time, and rounds to an integer to determine the most likely
-    relative offset between the slot numbering on the different nodes.
-    '''
-    baseline = map_slots_to_tsf(logs[0], slot_time=slot_time)
-    estimate_offsets = []
-    for i in range(len(logs)):
-        if i == 0:
-            estimate_offsets.append(0)
-            continue
-        node_slots = map_slots_to_tsf(logs[i], slot_time=slot_time)
-        total = 0.0
-        count = 0
-        for slot, tsf in baseline.items():
-            if slot in node_slots:
-                total += node_slots[slot] - tsf
-                count += 1
-        average = total / count
-        offset = average / slot_time
-        print("Average TSF offset is {0}. Estimated slot offset is {1} slots.".format(average, offset))
-        estimate_offsets.append(int(round(offset)))
-
-    return estimate_offsets
-
-def count_transmit_success(log):
-    count = 0
-    for entry in log:
-        if entry["transmitted"] == 1 and entry["transmit_success"] == 1:
-            count += 1
-    return count

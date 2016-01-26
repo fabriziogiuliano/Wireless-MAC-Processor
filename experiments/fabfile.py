@@ -50,10 +50,10 @@ def load_b43():
 @fab.task
 @fab.runs_once
 def setup(branch='metamac', firmware_branch=None, debug=False):
-    fab.local('mkdir -p cache')
+    fab.local('rm -rf cache && mkdir cache')
     with fab.lcd('cache'):
-        fab.local('wget http://security.ubuntu.com/ubuntu/pool/main/libx/libxml2/libxml2_2.9.1+dfsg1-3ubuntu4.6_i386.deb')
-        fab.local('wget http://security.ubuntu.com/ubuntu/pool/main/libx/libxml2/libxml2-dev_2.9.1+dfsg1-3ubuntu4.6_i386.deb')
+        fab.local('wget http://launchpadlibrarian.net/167352137/libxml2_2.9.1+dfsg1-3ubuntu4_i386.deb')
+        fab.local('wget http://launchpadlibrarian.net/167352140/libxml2-dev_2.9.1+dfsg1-3ubuntu4_i386.deb')
         fab.local('wget github.com/nflick/wireless-mac-processor/archive/{0}.zip'.format(branch))
         if firmware_branch is not None and firmware_branch != branch:
             fab.local('wget github.com/nflick/wireless-mac-processor/archive/{0}.zip'.format(firmware_branch))
@@ -70,8 +70,8 @@ def setup_remote(branch='metamac', firmware_branch=None, debug=False):
         firmware_branch = branch
 
     fab.run('rm -f *.deb')
-    fab.put(local_path='cache/libxml2_2.9.1+dfsg1-3ubuntu4.6_i386.deb', remote_path='.')
-    fab.put(local_path='cache/libxml2-dev_2.9.1+dfsg1-3ubuntu4.6_i386.deb', remote_path='.')
+    fab.put(local_path='cache/libxml2_2.9.1+dfsg1-3ubuntu4_i386.deb', remote_path='.')
+    fab.put(local_path='cache/libxml2-dev_2.9.1+dfsg1-3ubuntu4_i386.deb', remote_path='.')
     fab.run('dpkg -i *.deb')
     fab.run('rm -f *.deb')
 
@@ -131,7 +131,7 @@ def load_mac(mac, ap_node=None):
     fab.run('metamac/bytecode-manager -a 1')
 
 @fab.task
-def start_ap(mac):
+def start_ap(mac, channel=6):
     fab.run('ifconfig wlan0 192.168.0.$(hostname | grep -Eo [0-9]+) netmask 255.255.255.0 up')
     load_mac(mac)
     with fab.settings(warn_only=True):
@@ -141,6 +141,7 @@ def start_ap(mac):
         fab.run('if ! grep basic_rates=60 hostapd.conf; then echo "basic_rates=60" >> hostapd.conf; fi')
         fab.run('if ! grep supported_rates=60 hostapd.conf; then echo "supported_rates=60" >> hostapd.conf; fi')
         fab.run("sed -i 's/macaddr_acl=1/macaddr_acl=0/' hostapd.conf")
+        fab.run("sed -i 's/channel=6/channel={0}/' hostapd.conf".format(channel))
     # Must not be prefixed with cd work/association or else the cd will interfere with nohup.
     fab.run('nohup work/association/up-hostapd.sh work/association/hostapd.conf 192.168.0.$(hostname | grep -Eo [0-9]+) >& hostapd.log < /dev/null &', pty=False)
     fab.run('sleep 8')
@@ -148,6 +149,9 @@ def start_ap(mac):
 
 @fab.task
 def associate(mac):
+    with fab.settings(warn_only=True):
+        fab.run('killall hostapd')
+    fab.run('sleep 3')
     fab.run('ifconfig wlan0 192.168.0.$(hostname | grep -Eo [0-9]+) netmask 255.255.255.0 up')
     load_mac(mac)
     with fab.cd('work/association'):
@@ -167,6 +171,7 @@ def network(ap_node, mac=DEFAULT_MAC):
     fab.execute(associate, mac, hosts=[h for h in fab.env.hosts if h.split('@')[-1] != ap_node])
 
 @fab.task
+@fab.parallel
 def start_iperf_server():
     with fab.settings(warn_only=True):
         fab.run('killall iperf')
@@ -175,18 +180,27 @@ def start_iperf_server():
 
 @fab.task
 @fab.parallel
-def run_iperf_client(server, duration):
-    fab.run('iperf -c 192.168.0.$(echo {0} | grep -Eo [0-9]+) -u -d -t {1} -b 6000000'.format(server, duration))
+def run_iperf_client(ap_node, duration):
+    if on_node(ap_node):
+        target = next(h.split('@')[-1] for h in fab.env.hosts if h.split('@')[-1] != ap_node)
+    else:
+        target = ap_node
+    fab.run('iperf -c 192.168.0.$(echo {0} | grep -Eo [0-9]+) -u -t {1} -b 10000000'.format(target, duration))
 
 @fab.task
 @fab.parallel
-def start_metamac(suite, ap_node=None, cycle=False):
+def start_metamac(suite, ap_node=None, cycle=False, eta=0.0):
     with fab.settings(warn_only=True):
         fab.run('killall -s INT metamac/metamac')
     fab.run('sleep 2')
     if on_node(ap_node):
         suite = ap_ify(suite)
-    fab.run('nohup metamac/metamac {0} -l metamac.log metamac/wireless-mac-processor-*/mac-programs/metaMAC-program/{1} > metamac.out 2> metamac.err < /dev/null &'.format('-c' if cycle else '', suite), pty=False)
+    arguments = ''
+    if cycle:
+        arguments += '-c '
+    if eta > 0.0:
+        arguments += '-e {0} '.format(eta)
+    fab.run('nohup metamac/metamac {0} -l metamac.log metamac/wireless-mac-processor-*/mac-programs/metaMAC-program/{1} > metamac.out 2> metamac.err < /dev/null &'.format(arguments, suite), pty=False)
     fab.run('sleep 2')
 
 @fab.task
@@ -204,9 +218,9 @@ def stop_metamac(trialnum):
 @fab.task
 @fab.runs_once
 def run_trial(trialnum, suite, ap_node):
-    fab.execute(start_iperf_server, hosts=[ap_node])
+    fab.execute(start_iperf_server)
     fab.execute(start_metamac, suite, ap_node)
-    fab.execute(run_iperf_client, ap_node, 30, hosts=[h for h in fab.env.hosts if h.split('@')[-1] != ap_node])
+    fab.execute(run_iperf_client, ap_node, 30)
     fab.execute(stop_metamac, trialnum)
 
 @fab.task
