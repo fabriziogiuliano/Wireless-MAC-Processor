@@ -1,0 +1,54 @@
+<?xml version="1.0"?>
+<metamac eta="1.0" initial-protocol="0">
+  <protocol id="0" name="Aloha (p=1.0)">
+    <fsm path="aloha-slot-probability-always.ap.txt">
+    </fsm>
+    <emulator type="aloha">
+      <param key="persistence" value="1.0"/>
+    </emulator>
+  </protocol>
+  <protocol id="1" name="TDMA (slot 0)">
+    <fsm path="tdma-4.ap.txt">
+      <param num="12" value="4"/>
+      <param num="11" value="0"/>
+    </fsm>
+    <emulator type="tdma">
+      <param key="frame_offset" value="0"/>
+      <param key="frame_length" value="4"/>
+      <param key="slot_assignment" value="0"/>
+    </emulator>
+  </protocol>
+  <protocol id="2" name="TDMA (slot 1)">
+    <fsm path="tdma-4.ap.txt">
+      <param num="12" value="4"/>
+      <param num="11" value="1"/>
+    </fsm>
+    <emulator type="tdma">
+      <param key="frame_offset" value="0"/>
+      <param key="frame_length" value="4"/>
+      <param key="slot_assignment" value="1"/>
+    </emulator>
+  </protocol>
+  <protocol id="3" name="TDMA (slot 2)">
+    <fsm path="tdma-4.ap.txt">
+      <param num="12" value="4"/>
+      <param num="11" value="2"/>
+    </fsm>
+    <emulator type="tdma">
+      <param key="frame_offset" value="0"/>
+      <param key="frame_length" value="4"/>
+      <param key="slot_assignment" value="2"/>
+    </emulator>
+  </protocol>
+  <protocol id="4" name="TDMA (slot 3)">
+    <fsm path="tdma-4.ap.txt">
+      <param num="12" value="4"/>
+      <param num="11" value="3"/>
+    </fsm>
+    <emulator type="tdma">
+      <param key="frame_offset" value="0"/>
+      <param key="frame_length" value="4"/>
+      <param key="slot_assignment" value="3"/>
+    </emulator>
+  </protocol>
+</metamac>
