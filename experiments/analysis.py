@@ -7,6 +7,10 @@ import csv
 from math import *
 import re
 from glob import glob
+import tempfile
+from PIL import Image, ImageDraw, ImageFont
+import os
+import os.path
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -37,14 +41,14 @@ class Log:
             self.entries = [{k: parse_value(v) for k, v in r.items()} for r in reader if None not in r.values()]
         self.protocols = self.header[self.header.index('protocol')+1:]
 
-        self.first_jump = None
+        self.first_jump = len(self.entries)
         self.tsf_segments = []
         if len(self.entries) > 0:
             current_segment = [self.entries[0]["tsf_time"]]
             prev = current_segment[0]
             for i, entry in enumerate(self.entries):
                 if abs(entry["tsf_time"] - prev) > tsf_threshold:
-                    if self.first_jump is None:
+                    if self.first_jump > i:
                         self.first_jump = i
                     self.tsf_segments.append(current_segment)
                     current_segment = []
@@ -95,6 +99,16 @@ class Log:
             return self.entries[lo]
         return None
 
+    def success_rate(self):
+        transmissions = 0
+        successes = 0
+        for entry in self.entries:
+            if entry["transmitted"] == 1:
+                transmissions += 1
+                if entry["transmit_success"] == 1:
+                    successes += 1
+        return float(successes) / transmissions
+
 class Experiment:
     def __init__(self, globpattern, access_point=None, slot_time=2200, tsf_threshold=200000):
         self.access_point = access_point
@@ -129,14 +143,14 @@ class Experiment:
         proto = m.group(1)
         return int(proto)
 
-    def plot_tdma(self, modulo=None, slot_time=2200, all_xmit=False):
+    def plot_tdma(self, modulo=None, collisions=True, xlim=None, slotmax=2<<32, add_offset=0, saveto=None):
         if modulo is None:
             modulo = len(self.logs)
         if self.tsf_jumps:
             print("TSF jump behavior present!")
         #for log in logs:
         #    interpolate_tsf(log)
-        symbols = ["bo", "ro", "go", "yo"]
+        symbols = ['bo', 'ro', 'go', 'yo']
         assert(len(symbols) >= len(self.logs))
 
         x_max = 0.0
@@ -144,17 +158,118 @@ class Experiment:
         ax = plt.subplot(111)
         for i, log in enumerate(self.logs):
             nudge = .5 * (i + 1) / (len(self.logs) + 1)
-            x = [(r["slot_num"] + log.slot_offset) * (self.slot_time * 1e-6) for r in log.entries if r["transmitted"] == 1 and (all_xmit or r["transmit_success"] == 1)]
-            y = [((r["slot_num"] + log.slot_offset) % modulo) - .25 + nudge for r in log.entries if r["transmitted"] == 1 and (all_xmit or r["transmit_success"] == 1)]
+            x = [(r["slot_num"] + log.slot_offset) * (self.slot_time * 1e-6) for r in log.entries if (r["slot_num"] + log.slot_offset <= slotmax) and r["transmitted"] == 1 and r["transmit_success"] == 1]
+            y = [((r["slot_num"] + log.slot_offset + add_offset) % modulo) - .25 + nudge for r in log.entries if (r["slot_num"] + log.slot_offset <= slotmax) and r["transmitted"] == 1 and r["transmit_success"] == 1]
             ax.plot(x, y, symbols[i], label=log.node)
             if len(x) > 0:
                 x_max = max(x_max, max(x))
+            if collisions:
+                x = [(r["slot_num"] + log.slot_offset) * (self.slot_time * 1e-6) for r in log.entries if (r["slot_num"] + log.slot_offset <= slotmax) and r["transmitted"] == 1 and r["transmit_success"] == 0]
+                y = [((r["slot_num"] + log.slot_offset + add_offset) % modulo) - .25 + nudge for r in log.entries if (r["slot_num"] + log.slot_offset <= slotmax) and r["transmitted"] == 1 and r["transmit_success"] == 0]
+                ax.plot(x, y, symbols[i], mfc='none', mec=symbols[i][0], label=None)
 
         box = ax.get_position()
-        ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
-        ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-        ax.axis([0.0, x_max + 1.0, -1, modulo])
-        plt.show()
+        ax.set_position([box.x0, 1.0 - (1.0 - box.y0) * .9, box.width, box.height * .9])
+        plt.figlegend([l for l in ax.lines if l.get_markerfacecolor() != 'none'], [l.node for l in self.logs], loc = 'lower center', bbox_to_anchor = (0,0,1,1),
+            ncol=2, labelspacing=0.)
+        if xlim is not None:
+            ax.set_xlim(xlim)
+        ax.grid(True)
+        ax.set_xlabel('time (s)')
+        ax.set_ylabel('TDMA slot assignment')
+        ax.set_ylim([-0.5, 3.5])
+        plt.yticks([0, 1, 2, 3])
+        if saveto is None:
+            plt.show()
+        else:
+            plt.savefig(saveto)
+
+    def plot_weights(self, xlim=None, slotmax=2<<32, logscale=False, saveto=None):
+        for log in self.logs:
+            assert(log.protocols == self.logs[0].protocols)
+        if len(self.logs) == 4:
+            fig, axarr = plt.subplots(2, 2, sharex='col', sharey='row')
+            axes = [axarr[0, 0], axarr[1, 0], axarr[1, 1], axarr[0, 1]]
+            symbols = ["b", "r", "g", "y", "k"]
+        else:
+            raise Exception('Unimplemented number of nodes.')
+
+        for log, ax in zip(self.logs, axes):
+            for i, proto in enumerate(log.protocols):
+                x = [(r["slot_num"] + log.slot_offset) * (self.slot_time * 1e-6) for r in log.entries if (r["slot_num"] + log.slot_offset <= slotmax)]
+                y = [r[proto] for r in log.entries if (r["slot_num"] + log.slot_offset <= slotmax)]
+                if logscale:
+                    ax.semilogy(x, y, symbols[i], label=proto)
+                else:
+                    ax.plot(x, y, symbols[i], label=proto)
+            ax.set_title(log.node)
+            if logscale:
+                pass
+                #ax.set_ylim([1e-20, 1.0])
+            else:
+                ax.set_ylim([0.0, 1.0])
+            if xlim is not None:
+                ax.set_xlim(xlim)
+            if log == self.logs[0] or log == self.logs[1]:
+                ax.set_ylabel('Protocol weight')
+            if log == self.logs[1] or log == self.logs[2]:
+                ax.set_xlabel('time (s)')
+            ax.grid(True)
+            box = ax.get_position()
+            newbox = [box.x0, 1.0 - (1.0 - box.y0) * .9, box.width, box.height * .9]
+            print(box)
+            print(newbox)
+            ax.set_position(newbox)
+        plt.figlegend( ax.lines, log.protocols, loc = 'lower center', bbox_to_anchor = (0,0,1,1),
+            ncol=2, labelspacing=0.)
+        if saveto is None:
+            plt.show()
+        else:
+            plt.savefig(saveto)
+
+    def animate(self, start_slot_num, end_slot_num, naming, view_width=136, logscale=False):
+        name_template = os.path.splitext(naming)[0] + '{0}' + os.path.splitext(naming)[1]
+        font = ImageFont.truetype('/usr/share/fonts/TTF/Inconsolata-Regular.ttf', 30)
+        xmit_attempted = 0
+        xmit_succeeded = 0
+        slots_queued = 0
+        slots_succeeded = 0
+        for slot_num in range(0, max(l.entries[-1]["slot_num"] for l in self.logs)):
+            slot_queued = False
+            slot_succeeded = False
+            for log in self.logs:
+                slot = log.slot_num(slot_num - log.slot_offset)
+                if slot is not None:
+                    xmit_attempted += slot["transmitted"]
+                    xmit_succeeded += slot["transmitted"] & slot["transmit_success"]
+                    slot_queued = slot_queued or (slot["packet_queued"] == 1)
+                    slot_succeeded = slot_succeeded or (slot["transmitted"] & slot["transmit_success"] == 1)
+            if slot_queued:
+                slots_queued += 1
+            if slot_succeeded:
+                slots_succeeded += 1
+            if slot_num >= start_slot_num and slot_num <= end_slot_num:
+                tdma_fig = tempfile.mktemp() + ".png"
+                self.plot_tdma(xlim=[(slot_num - (view_width / 2)) * .0022, (slot_num + (view_width / 2)) * .0022], slotmax=slot_num, saveto=tdma_fig)
+                weights_fig = tempfile.mktemp() + ".png"
+                self.plot_weights(xlim=[(slot_num - (view_width / 2)) * .0022, (slot_num + (view_width / 2)) * .0022], logscale=logscale, slotmax=slot_num, saveto=weights_fig)
+                combined = Image.new("RGB", (1600, 800), (255, 255, 255))
+                combined.paste(Image.open(tdma_fig, 'r'), (0, 0))
+                combined.paste(Image.open(weights_fig, 'r'), (800, 0))
+                draw = ImageDraw.Draw(combined)
+                draw.text((60, 650), 'Slot number: ' + str(slot_num), font=font, fill=(0,0,0))
+                draw.text((60, 700), 'Time: {:.2f}ms'.format(slot_num * .0022), font=font, fill=(0,0,0))
+                msg = 'Channel utilization: {:.4f}%'.format(slots_succeeded / slots_queued) if slots_queued > 0 else 'Channel utilization: N/A'
+                draw.text((60, 750), msg, font=font, fill=(0,0,0))
+                draw.text((860, 650), 'Total transmissions attempted: ' + str(xmit_attempted), font=font, fill=(0,0,0))
+                draw.text((860, 700), 'Total transmissions succeeded: ' + str(xmit_succeeded), font=font, fill=(0,0,0))
+                msg = 'Transmission success rate: {:.4f}%'.format(xmit_succeeded / xmit_attempted) if xmit_attempted > 0 else 'Transmission success rate: N/A'
+                draw.text((860, 750), msg, font=font, fill=(0,0,0))
+                combined.save(name_template.format(str(slot_num).zfill(5)))
+                combined.close()
+                os.remove(tdma_fig)
+                os.remove(weights_fig)
+
 
 def count(logs, *predicates):
     count = 0
@@ -168,6 +283,11 @@ def count(logs, *predicates):
             if satisfies:
                 count += 1
     return count
+
+def load_log(path):
+    with open(path, 'r') as f:
+        reader = csv.DictReader(f)
+        return [{k: parse_value(v) for k, v in r.items()} for r in reader if None not in r.values()]
 
 def invalid_offsets(log, modulo):
     slots = []

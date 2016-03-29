@@ -7,9 +7,13 @@ Author: Nathan Flick
 import os
 import os.path
 import datetime
+import re
+from time import sleep
 
 import fabric.api as fab
 import fabric.utils
+
+fab.env.user = 'root'
 
 DEFAULT_MAC = 'tdma-4.txt'
 
@@ -55,6 +59,7 @@ def setup(branch='metamac', firmware_branch=None, debug=False):
         fab.local('wget http://launchpadlibrarian.net/167352137/libxml2_2.9.1+dfsg1-3ubuntu4_i386.deb')
         fab.local('wget http://launchpadlibrarian.net/167352140/libxml2-dev_2.9.1+dfsg1-3ubuntu4_i386.deb')
         fab.local('wget github.com/nflick/wireless-mac-processor/archive/{0}.zip'.format(branch))
+        fab.local('wget -O iperf.zip github.com/nflick/iperf/archive/master.zip')
         if firmware_branch is not None and firmware_branch != branch:
             fab.local('wget github.com/nflick/wireless-mac-processor/archive/{0}.zip'.format(firmware_branch))
     fab.execute(setup_remote, branch, firmware_branch, debug)
@@ -74,6 +79,14 @@ def setup_remote(branch='metamac', firmware_branch=None, debug=False):
     fab.put(local_path='cache/libxml2-dev_2.9.1+dfsg1-3ubuntu4_i386.deb', remote_path='.')
     fab.run('dpkg -i *.deb')
     fab.run('rm -f *.deb')
+
+    fab.run('rm -rf iperf-master')
+    fab.put(local_path='cache/iperf.zip', remote_path='.')
+    fab.run('unzip iperf.zip')
+    fab.run('rm iperf.zip')
+    with fab.cd('iperf-master'):
+        fab.run('./configure')
+        fab.run('make')
 
     fab.run('rm -rf metamac && mkdir metamac')
     with fab.cd('metamac'):
@@ -118,6 +131,12 @@ def ap_ify(path):
 
 def on_node(node):
     return fab.env.host_string.split('@')[-1] == node
+
+def node_num(node):
+    m = re.match(r'alix(\d+)', node)
+    if not m:
+        raise Exception('Unknown node naming convention')
+    return int(m.group(1))
 
 @fab.task
 def load_mac(mac, ap_node=None):
@@ -172,20 +191,29 @@ def network(ap_node, mac=DEFAULT_MAC):
 
 @fab.task
 @fab.parallel
-def start_iperf_server():
+def start_iperf_server(ports):
     with fab.settings(warn_only=True):
-        fab.run('killall iperf')
+        fab.run('killall iperf-master/src/iperf3')
     fab.local('sleep 3')
-    fab.run('nohup iperf -s -u > iperf.out 2> iperf.err < /dev/null &', pty=False)
+    for port in ports:
+        fab.run('nohup iperf-master/src/iperf3 -s -p {0} > iperf.out 2> iperf.err < /dev/null &'.format(port), pty=False)
 
 @fab.task
 @fab.parallel
-def run_iperf_client(ap_node, duration):
+def run_iperf_client(ap_node, duration, linear=False, bandwidth=6000000, delay=False):
     if on_node(ap_node):
         target = next(h.split('@')[-1] for h in fab.env.hosts if h.split('@')[-1] != ap_node)
     else:
         target = ap_node
-    fab.run('iperf -c 192.168.0.$(echo {0} | grep -Eo [0-9]+) -u -t {1} -b 10000000'.format(target, duration))
+    port = 5000 + node_num(fab.env.host_string.split('@')[-1])
+    for i, host in enumerate(fab.env.hosts):
+        if host.split('@')[-1] == fab.env.host_string.split('@'):
+            delay = i * 0.5
+    else:
+        delay = 0.0
+    sleep(delay)
+    fab.run('iperf-master/src/iperf3 -c 192.168.0.$(echo {0} | grep -Eo [0-9]+) -p {1} -u -t {2} -b {3} {4}'.format(
+        target, port, duration, bandwidth, '-r' if linear else ''))
 
 @fab.task
 @fab.parallel
@@ -217,10 +245,11 @@ def stop_metamac(trialnum):
 
 @fab.task
 @fab.runs_once
-def run_trial(trialnum, suite, ap_node):
-    fab.execute(start_iperf_server)
+def run_trial(trialnum, suite, ap_node, linear=False, bandwidth=6000000, delay=False):
+    ports = [str(5000 + node_num(h.split('@')[-1])) for h in fab.env.hosts]
+    fab.execute(start_iperf_server, ports, hosts=[ap_node])
     fab.execute(start_metamac, suite, ap_node)
-    fab.execute(run_iperf_client, ap_node, 30)
+    fab.execute(run_iperf_client, ap_node, 30, linear=linear, bandwidth=bandwidth, delay=delay)
     fab.execute(stop_metamac, trialnum)
 
 @fab.task
