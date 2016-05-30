@@ -2,4 +2,5 @@ wmp-injection/bytecode-manager/bytecode-manager
 wmp-injection/bytecode-manager/metamac
 wmp-injection/bytecode-manager/tsfrecorder
 wmp-injection/bytecode-manager/slotrecorder
+experiments/fabfile.pyc
 *.o
