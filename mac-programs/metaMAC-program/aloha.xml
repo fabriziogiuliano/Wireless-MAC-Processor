@@ -2,7 +2,7 @@
 <metamac eta="1.0" initial-protocol="0">
   <protocol id="0" name="Aloha (p=1.0)">
     <fsm path="aloha-slot-probability-always.txt">
-      <param num="14" value="65535"/>
+      <param num="14" value="0"/>
     </fsm>
     <emulator type="aloha">
       <param key="persistence" value="1.0"/>
@@ -18,7 +18,7 @@
   </protocol>
   <protocol id="2" name="Aloha (p=0.25)">
     <fsm path="aloha-slot-probability-always.txt">
-      <param num="14" value="16383"/>
+      <param num="14" value="49151"/>
     </fsm>
     <emulator type="aloha">
       <param key="persistence" value="0.25"/>
@@ -26,7 +26,7 @@
   </protocol>
   <protocol id="3" name="Aloha (p=0.125)">
     <fsm path="aloha-slot-probability-always.txt">
-      <param num="14" value="8191"/>
+      <param num="14" value="57343"/>
     </fsm>
     <emulator type="aloha">
       <param key="persistence" value="0.125"/>
@@ -34,7 +34,7 @@
   </protocol>
   <protocol id="4" name="Aloha (p=0.0625)">
     <fsm path="aloha-slot-probability-always.txt">
-      <param num="14" value="2047"/>
+      <param num="14" value="61439"/>
     </fsm>
     <emulator type="aloha">
       <param key="persistence" value="0.0625"/>
