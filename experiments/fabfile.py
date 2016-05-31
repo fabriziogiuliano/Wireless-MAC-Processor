@@ -49,7 +49,7 @@ def load_b43():
 
 @fab.task
 @fab.parallel
-def setup(branch='metamac', get_src=True,firmware_branch=None, debug=False,gituser='fabriziogiuliano'):
+def setup(branch='metamac', get_src=False,firmware_branch=None, debug=False,gituser='fabriziogiuliano'):
 
     '''Sets up the node by downloading the specified branch or commit and extracting necessary
     files, installing the WMP firmware, and building needed tools.
@@ -77,14 +77,14 @@ def setup(branch='metamac', get_src=True,firmware_branch=None, debug=False,gitus
 
 		fab.run('unzip {0}.zip "wireless-mac-processor-{0}/wmp-engine/broadcom-metaMAC/*"'.format(firmware_branch))
 		fab.run('rm {0}.zip'.format(firmware_branch))
-
     with fab.cd('metamac/wireless-mac-processor-{0}/wmp-engine/broadcom-metaMAC/'.format(firmware_branch)):
         fab.run('cp ucode5.fw b0g0bsinitvals5.fw b0g0initvals5.fw /lib/firmware/b43')
         with fab.settings(warn_only=True):
             fab.run('rmmod b43')
-        fab.run('sleep 1')
-        fab.run('modprobe b43 qos=0')
-        fab.run('sleep 1')
+            fab.run('sleep 1')
+            fab.run('modprobe b43 qos=0')
+            fab.run('sleep 1')
+
     with fab.cd('~/metamac/wireless-mac-processor-{0}/wmp-injection/bytecode-manager/'.format(branch)):
         if debug:
             fab.run("sed -i 's/CFLAGS=/CFLAGS=-g /' Makefile")
@@ -169,7 +169,7 @@ def start_ap(mac):
     #fab.run('ifconfig wlan0 192.168.0.$(hostname | grep -Eo [0-9]+) netmask 255.255.255.0 up')
     #load_mac(mac)
     with fab.settings(warn_only=True):
-        fab.run('killall -9 hostapd')
+    	fab.run('killall -9 hostapd')
     	fab.run('killall -9 metamac')
     fab.run('scp ~/work/openfwwf-5.2/*.fw /lib/firmware/b43/')
     with fab.cd('work/association'):
@@ -187,8 +187,9 @@ def start_ap(mac):
 def associate(mac=DEFAULT_MAC):
 
     #load_mac(mac)
-    fab.run('modprobe b43 qos=0')
-    fab.run('rmmod b43')
+    with fab.settings(warn_only=True):
+    	fab.run('killall -9 hostapd')
+	fab.run('rmmod b43')
     fab.run('modprobe b43 qos=0')
     fab.run('ifconfig wlan0 192.168.0.$(hostname | grep -Eo [0-9]+) netmask 255.255.255.0')
     fab.run('iwconfig wlan0 essid alix-ap')

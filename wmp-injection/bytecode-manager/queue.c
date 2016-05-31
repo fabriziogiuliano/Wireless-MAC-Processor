@@ -9,7 +9,7 @@
 void queue_init(struct metamac_queue *queue, size_t capacity)
 {
 	if (capacity <= 0) {
-		errx(EXIT_FAILURE, "Invalid capacity value: %ld.\n", capacity);
+		errx(EXIT_FAILURE, "Invalid capacity value: %zu.\n", capacity);
 	}
 
 	queue->data = malloc(sizeof(struct metamac_slot) * capacity);
