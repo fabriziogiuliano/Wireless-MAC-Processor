@@ -248,11 +248,17 @@ def run_iperf_client(server, duration):
     fab.run('iperf -c 192.168.0.$(echo {0} | grep -Eo [0-9]+) -u -t {1} -b 6000000'.format(server, duration))
 
 @fab.task
-def start_metamac(suite, ap_node=None, cycle=False):
+@fab.parallel
+def start_metamac(suite, ap_node=None, cycle=False, eta=0.0):
     if on_node(ap_node):
         suite = ap_ify(suite)
+    arguments = ''
+    if cycle:
+        arguments += '-c '
+    if eta > 0.0:
+        arguments += '-e {0} '.format(eta)
     if not on_node(ap_node):
-    	fab.run('killall -9 metamac; nohup metamac/metamac {0} -l metamac.log metamac/wireless-mac-processor-*/mac-programs/metaMAC-program/{1} > metamac.out 2> metamac.err < /dev/null &'.format('-c' if cycle else '', suite), pty=False)
+    	fab.run('killall -9 metamac; nohup metamac/metamac {0} -l metamac.log metamac/wireless-mac-processor-*/mac-programs/metaMAC-program/{1} > metamac.out 2> metamac.err < /dev/null &'.format(arguments, suite), pty=False)
     fab.run('sleep 2')
 
 @fab.task
