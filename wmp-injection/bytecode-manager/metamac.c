@@ -53,6 +53,7 @@ void update_weights(struct protocol_suite* suite, struct metamac_slot current_sl
 			double d = suite->protocols[p].emulator(suite->protocols[p].parameter, 
 				current_slot.slot_num, suite->slot_offset, suite->last_slot);
 			suite->weights[p] *= exp(-(suite->eta) * fabs(d - z));
+			suite->weights[p]=suite->weights[p]<0.01?0.01:suite->weights[p];
 		}
 
 		/* Normalize the weights */

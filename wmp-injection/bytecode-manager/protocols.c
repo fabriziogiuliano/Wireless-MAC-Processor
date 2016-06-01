@@ -31,7 +31,7 @@ TX - BUSY
 //	int tx_trial = (((double)rand()) < pers?1:0);
 	double tx_trial_f = ((double)rand()/(double)RAND_MAX);
 	int tx_trial = tx_trial_f <pers ? 1:0;
-	double X = (previous_slot.channel_busy ^ (int)(tx_trial));
+	double X = (double)(tx_trial);
 	fprintf(stderr,"pers=%.2f,tx_trial_f=%.2f,tx_trial=%d,channel_busy=%d,X=%.2f\n",pers,tx_trial_f,tx_trial,previous_slot.channel_busy,X);
 
 
@@ -44,6 +44,6 @@ TX - BUSY
 //		/* Transmit with a probability of the persistance parameter. */
 //		return ((struct aloha_param*)param)->persistence;
 //	}
-	return 1.0;
+	return X;
 
 }
