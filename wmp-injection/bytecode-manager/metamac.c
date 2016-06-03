@@ -391,7 +391,7 @@ int metamac_process_loop(struct metamac_queue *queue, struct debugfs_file *df,
 			err(EXIT_FAILURE, "Unable to open log file");
 		}
 
-		fprintf(logfile, "slot_num,offset,read_num,host_time,tsf_time,slot_index,slots_passed,filler,packet_queued,transmitted,transmit_success,transmit_other,bad_reception,busy_slot,channel_busy,protocol");
+		fprintf(logfile, "slot_num,offset,read_num,host_time,tsf_time,slot_index,slots_passed,filler,packet_queued,transmitted,transmit_success,transmit_other,bad_reception,busy_slot,channel_busy,pcoll,protocol");
 		for (int i = 0; i < suite->num_protocols; i++) {
 			fprintf(logfile, ",%s", suite->protocols[i].name);
 		}
@@ -406,16 +406,22 @@ int metamac_process_loop(struct metamac_queue *queue, struct debugfs_file *df,
 	clock_gettime(CLOCK_MONOTONIC_RAW, &last_update_time);
 
 	metamac_loop_break = 0;
+	unsigned long long count_transmitted=0;
+	unsigned long long count_transmit_success=0;
+	unsigned long long count_transmitted_=0;
+	unsigned long long count_transmit_success_=0;
+	double pcoll = 0;
 	while (metamac_loop_break == 0) {
 
 		struct metamac_slot slots[16];
 		size_t count = queue_multipop(queue, slots, ARRAY_SIZE(slots));
-
 		for (int i = 0; i < count; i++) {
 			update_weights(suite, slots[i]);
 
+			count_transmitted+=slots[i].transmitted;
+			count_transmit_success+=slots[i].transmit_success;
 			if (logfile != NULL) {
-				fprintf(logfile, "%llu,%d,%llu,%llu,%llu,%d,%d,%01x,%01x,%01x,%01x,%01x,%01x,%01x,%01x,%s",
+				fprintf(logfile, "%llu,%d,%llu,%llu,%llu,%d,%d,%01x,%01x,%01x,%01x,%01x,%01x,%01x,%01x,%e,%llu,%llu,%llu,%llu,%s",
 					(unsigned long long) slots[i].slot_num,
 					suite->slot_offset,
 					(unsigned long long) slots[i].read_num,
@@ -431,6 +437,11 @@ int metamac_process_loop(struct metamac_queue *queue, struct debugfs_file *df,
 					slots[i].bad_reception,
 					slots[i].busy_slot,
 					slots[i].channel_busy,
+					pcoll,
+					count_transmitted,
+					count_transmit_success,
+					count_transmitted_,
+					count_transmit_success_,
 					suite->protocols[suite->active_protocol].name);
 
 				for (int i = 0; i < suite->num_protocols; i++) {
@@ -455,6 +466,12 @@ int metamac_process_loop(struct metamac_queue *queue, struct debugfs_file *df,
 
 		/* Update display every 1 second. */
 		if (timediff > 1000000L) {
+			//compute pcoll every timediff
+			if ((count_transmit_success-count_transmit_success_)>0){
+				pcoll = 1 -  (double)(count_transmit_success-count_transmit_success_)/(double)(count_transmitted-count_transmitted_) ;
+			}
+			count_transmitted_ = count_transmitted; 
+			count_transmit_success_ = count_transmit_success; 
 			if (flags & FLAG_VERBOSE) {
 				metamac_display(loop++, suite);
 			}
