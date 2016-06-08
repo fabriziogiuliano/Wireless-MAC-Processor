@@ -84,7 +84,6 @@ void update_weights(struct protocol_suite* suite, struct metamac_slot current_sl
 			suite->weights[p] *= exp(-(suite->eta) * fabs(d - z));
 			suite->weights[p]=suite->weights[p]<0.01?0.01:suite->weights[p];
 		}
-		fprintf(stderr,"D=%e,z=%e,x=%e,c=%e\n",D,z,x,c);
 
 		/* Normalize the weights */
 		double s = 0;
