@@ -40,21 +40,48 @@ void update_weights(struct protocol_suite* suite, struct metamac_slot current_sl
 			params->frame_length;
 		suite->slot_offset = (params->frame_length - neg_offset) % params->frame_length;
 	}
-
 	/* If there is no packet queued for this slot, consider all protocols to be correct
 	and thus the weights will not change. */
+	
+	double c=1.0/2*(1+exp(-(suite->eta)))/(1-exp(-(suite->eta)))*log(2/(1+exp(-suite->eta)));
+	double x = 0.0;
+	double D = 0;
+	double z = 0;
 	if (current_slot.packet_queued) {
 		/* z represents the correct decision for this slot - transmit if the channel
 		is idle (1.0) or defer if it is busy (0.0) */
-		double z = (!current_slot.channel_busy) ? 1.0 : 0.0;
+		if (suite->protocols[suite->active_protocol].emulator == tdma_emulate) {
 
+			z = (!current_slot.channel_busy) ? 1 : 0;
+		}
+		
+		if (suite->protocols[suite->active_protocol].emulator == aloha_emulate) {
+
+			for (int p = 0; p < suite->num_protocols; ++p) {
+				x += ((struct aloha_param*)suite->protocols[p].parameter)->persistence * suite->weights[p];
+			}
+/*
+			if (x<0.5-c) {
+				D=0;
+			}else{ 
+				if (x>0.5+c) 
+					D=1;
+				else
+				      D=1/2/c*(x-0.5+c);
+			}
+*/
+			D = 1;
+			z = (!current_slot.channel_busy) ? D : 1-D;
+		}
 		for (int p = 0; p < suite->num_protocols; ++p) {
 			/* d is the decision of this component protocol - between 0 and 1 */
 			double d = suite->protocols[p].emulator(suite->protocols[p].parameter, 
 				current_slot.slot_num, suite->slot_offset, suite->last_slot);
+			
 			suite->weights[p] *= exp(-(suite->eta) * fabs(d - z));
 			suite->weights[p]=suite->weights[p]<0.01?0.01:suite->weights[p];
 		}
+		fprintf(stderr,"D=%e,z=%e,x=%e,c=%e\n",D,z,x,c);
 
 		/* Normalize the weights */
 		double s = 0;
@@ -145,8 +172,8 @@ void metamac_init(struct debugfs_file * df, struct protocol_suite *suite, metama
 		struct options opt;
 		opt.load = "1";
 		opt.name_file = suite->protocols[suite->active_protocol].fsm_path;
-		bytecodeSharedWrite(df, &opt);
-		configure_params(df, 0, suite->protocols[suite->active_protocol].fsm_params);
+		//bytecodeSharedWrite(df, &opt);
+		//configure_params(df, 0, suite->protocols[suite->active_protocol].fsm_params);
 
 		opt.active = opt.load;
 		writeAddressBytecode(df, &opt);

@@ -108,7 +108,7 @@ def setup_local(branch='metamac', get_src=True,firmware_branch=None, debug=False
     if get_src:
 	    with fab.cd('/tmp'):
 		fab.run('rm -f *.deb')
-		fab.run('wget http://security.ubuntu.com/ubuntu/pool/main/libx/libxml2/libxml2_2.9.1+dfsg1-3ubuntu4.7_i386.deb')
+		fab.run('wget http://security.ubuntu.com/ubuntu/pool/main/libx/libxml2/libxml2_2.9.1+dfsg1-3ubuntu4_i386.deb')
 		fab.run('wget http://security.ubuntu.com/ubuntu/pool/main/libx/libxml2/libxml2-dev_2.9.1+dfsg1-3ubuntu4.7_i386.deb')
 		fab.run('dpkg -i *.deb')
 		fab.run('rm -f *.deb')
