@@ -44,6 +44,9 @@ void update_weights(struct protocol_suite* suite, struct metamac_slot current_sl
 	and thus the weights will not change. */
 	
 	double z = 0;
+	double uu=0;
+	double d=0;
+	double p_curr = ((struct aloha_param*)(suite->protocols[suite->active_protocol].parameter))->persistence;
 	if (current_slot.packet_queued) {
 		/* z represents the correct decision for this slot - transmit if the channel
 		is idle (1.0) or defer if it is busy (0.0) */
@@ -63,24 +66,30 @@ void update_weights(struct protocol_suite* suite, struct metamac_slot current_sl
 			//	z = p_current
 			//else
 			//	z = 1 - p_current
-			
+
+
 			if (	(current_slot.transmitted & current_slot.transmit_success) |	
 				(~current_slot.transmitted & (current_slot.transmit_other | current_slot.bad_reception)) ) {	
-					z = suite->protocols[suite->active_protocol].parameter;
+					z = p_curr;
+					uu=1;
 				}
 			
 			else 
 				if (	(current_slot.transmitted & ~current_slot.transmit_success) | 
 					(~current_slot.transmitted & ~(current_slot.transmit_other | current_slot.bad_reception)) ){
-					z = 1.0 - suite->protocols[suite->active_protocol].parameter;
+					z = 1.0 - p_curr;
+					uu=0;
 				}
+
+			//z = (!current_slot.channel_busy) ? p_curr : 1-p_curr;
 			
 		}
 		for (int p = 0; p < suite->num_protocols; ++p) {
 			/* d is the decision of this component protocol - between 0 and 1 */
-			double d = suite->protocols[p].emulator(suite->protocols[p].parameter, 
+			d = suite->protocols[p].emulator(suite->protocols[p].parameter, 
 				current_slot.slot_num, suite->slot_offset, suite->last_slot);
 			
+			fprintf(stderr,"[%d] uu=%e,d=%e,z=%e,p_curr=%e\n",p,uu,d,z,p_curr);
 			suite->weights[p] *= exp(-(suite->eta) * fabs(d - z));
 			suite->weights[p]=suite->weights[p]<0.01?0.01:suite->weights[p];
 		}
@@ -176,9 +185,9 @@ void metamac_init(struct debugfs_file * df, struct protocol_suite *suite, metama
 		opt.name_file = suite->protocols[suite->active_protocol].fsm_path;
 		//bytecodeSharedWrite(df, &opt);
 		//configure_params(df, 0, suite->protocols[suite->active_protocol].fsm_params);
-
 		opt.active = opt.load;
-		writeAddressBytecode(df, &opt);
+		
+		//writeAddressBytecode(df, &opt);
 
 		suite->slots[0] = suite->active_protocol;
 		suite->slots[1] = -1;
@@ -275,7 +284,7 @@ static void metamac_evaluate(struct debugfs_file *df, struct protocol_suite *sui
 		if (timediff > 1000000L) {
 			load_protocol(df, suite, (suite->active_protocol + 1) % suite->num_protocols);
 		}
-	} else if (best != suite->active_protocol) {
+	} else {
 		load_protocol(df, suite, best);
 	}
 }

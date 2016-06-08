@@ -17,15 +17,5 @@ double tdma_emulate(void *param, int slot_num, int offset, struct metamac_slot p
 
 double aloha_emulate(void *param, int slot_num, int offset, struct metamac_slot previous_slot)
 {
-	/* Determine if this is the first slot that this packet has been queued
-	to transmit. */
-	if (previous_slot.slot_num != slot_num || /* Previous slot was not recorded. Assume nothing queued. */
-		!previous_slot.packet_queued ||
-		(previous_slot.transmitted && previous_slot.transmit_success)) {
-		/* First slot this packet has been queued. Transmit. */
-		return 1.0;
-	} else {
-		/* Transmit with a probability of the persistance parameter. */
-		return ((struct aloha_param*)param)->persistence;
-	}
+	return ((struct aloha_param*)param)->persistence;
 }

@@ -250,10 +250,6 @@ def run_iperf_client(server, duration):
 
 @fab.task
 def start_metamac(suite, ap_node=None, eta=0.0, cycle=False):
-    with fab.settings(warn_only=True):
-	    fab.run('killall -9 metamac');
-	    #fab.run('~/metamac/bytecode-manager -l1 -m /root/metamac/wireless-mac-processor-aloha/mac-programs/metaMAC-program/dcf_v3-2.txt && ~/metamac/bytecode-manager -a 1')
-	    fab.run('~/metamac/bytecode-manager -l1 -m /root/metamac/wireless-mac-processor-aloha/mac-programs/metaMAC-program/aloha-slot-probability-always.txt && ~/metamac/bytecode-manager -a 1 &')
     if on_node(ap_node):
         suite = ap_ify(suite)
     arguments = ''
@@ -262,6 +258,10 @@ def start_metamac(suite, ap_node=None, eta=0.0, cycle=False):
     if eta > 0.0:
         arguments += '-e {0} '.format(eta)
     if not on_node(ap_node):
+	with fab.settings(warn_only=True):
+		fab.run('killall -9 metamac');
+		#fab.run('~/metamac/bytecode-manager -l1 -m /root/metamac/wireless-mac-processor-aloha/mac-programs/metaMAC-program/dcf_v3-2.txt && ~/metamac/bytecode-manager -a 1')
+		fab.run('~/metamac/bytecode-manager -l1 -m /root/metamac/wireless-mac-processor-aloha/mac-programs/metaMAC-program/aloha-slot-probability-always.txt && ~/metamac/bytecode-manager -a 1')
     	fab.run('killall -9 metamac; nohup metamac/metamac {0} -l metamac.log metamac/wireless-mac-processor-*/mac-programs/metaMAC-program/{1} > metamac.out 2> metamac.err < /dev/null &'.format(arguments, suite), pty=False)
     fab.run('sleep 2')
 
