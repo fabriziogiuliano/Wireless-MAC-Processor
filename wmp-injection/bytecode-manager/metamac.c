@@ -183,11 +183,15 @@ void metamac_init(struct debugfs_file * df, struct protocol_suite *suite, metama
 		struct options opt;
 		opt.load = "1";
 		opt.name_file = suite->protocols[suite->active_protocol].fsm_path;
-		//bytecodeSharedWrite(df, &opt);
-		//configure_params(df, 0, suite->protocols[suite->active_protocol].fsm_params);
+
+		putInWaitMode(df);
+		bytecodeSharedWrite(df, &opt);
+		returnFromWaitMode(df);	
+
+		configure_params(df, 0, suite->protocols[suite->active_protocol].fsm_params);
 		opt.active = opt.load;
-		
-		//writeAddressBytecode(df, &opt);
+
+		writeAddressBytecode(df, &opt);
 
 		suite->slots[0] = suite->active_protocol;
 		suite->slots[1] = -1;

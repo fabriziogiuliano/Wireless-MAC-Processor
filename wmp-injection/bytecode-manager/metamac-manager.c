@@ -139,6 +139,7 @@ int main(int argc, char *argv[])
 	queue_init(&params->queue, 256);
 	init_file(&params->df);
 	params->flags = arguments.metamac_flags;
+	
 
 	metamac_init(&params->df, suite, arguments.metamac_flags);
 
