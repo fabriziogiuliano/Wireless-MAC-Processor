@@ -43,9 +43,6 @@ void update_weights(struct protocol_suite* suite, struct metamac_slot current_sl
 	/* If there is no packet queued for this slot, consider all protocols to be correct
 	and thus the weights will not change. */
 	
-	double c=1.0/2*(1+exp(-(suite->eta)))/(1-exp(-(suite->eta)))*log(2/(1+exp(-suite->eta)));
-	double x = 0.0;
-	double D = 0;
 	double z = 0;
 	if (current_slot.packet_queued) {
 		/* z represents the correct decision for this slot - transmit if the channel
@@ -57,21 +54,27 @@ void update_weights(struct protocol_suite* suite, struct metamac_slot current_sl
 		
 		if (suite->protocols[suite->active_protocol].emulator == aloha_emulate) {
 
-			for (int p = 0; p < suite->num_protocols; ++p) {
-				x += ((struct aloha_param*)suite->protocols[p].parameter)->persistence * suite->weights[p];
-			}
-/*
-			if (x<0.5-c) {
-				D=0;
-			}else{ 
-				if (x>0.5+c) 
-					D=1;
-				else
-				      D=1/2/c*(x-0.5+c);
-			}
-*/
-			D = 1;
-			z = (!current_slot.channel_busy) ? D : 1-D;
+			
+			// transmission AND success: GOOD
+			// no trasmission AND slot busy - GOOD
+			// trasmission AND NOT success - WRONG 
+			// trasmission  AND slot empty - WRONG
+			//if GOOD
+			//	z = p_current
+			//else
+			//	z = 1 - p_current
+			
+			if (	(current_slot.transmitted & current_slot.transmit_success) |	
+				(~current_slot.transmitted & (current_slot.transmit_other | current_slot.bad_reception)) ) {	
+					z = suite->protocols[suite->active_protocol].parameter;
+				}
+			
+			else 
+				if (	(current_slot.transmitted & ~current_slot.transmit_success) | 
+					(~current_slot.transmitted & ~(current_slot.transmit_other | current_slot.bad_reception)) ){
+					z = 1.0 - suite->protocols[suite->active_protocol].parameter;
+				}
+			
 		}
 		for (int p = 0; p < suite->num_protocols; ++p) {
 			/* d is the decision of this component protocol - between 0 and 1 */
@@ -324,6 +327,7 @@ int metamac_read_loop(struct metamac_queue *queue, struct debugfs_file *df,
 			channel_busy = (transmitted & ~transmit_success) |
 				((transmit_other | bad_reception | busy_slot) & ~(transmitted & transmit_success));
 		} else {
+			
 			channel_busy = (transmitted & ~transmit_success) |
 				((transmit_other | bad_reception) & ~(transmitted & transmit_success));
 		}
