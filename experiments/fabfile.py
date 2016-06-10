@@ -67,13 +67,13 @@ def setup(branch='metamac', get_src=False,firmware_branch=None, debug=False,gitu
 
 	    fab.run('rm -rf metamac && mkdir metamac')
 	    with fab.cd('metamac'):
-		fab.run('wget github.com/{1}/wireless-mac-processor/archive/{0}.zip'.format(branch,gituser))
+		fab.run('wget --no-check-certificate github.com/{1}/wireless-mac-processor/archive/{0}.zip'.format(branch,gituser))
 		fab.run('unzip {0}.zip "wireless-mac-processor-{0}/wmp-injection/bytecode-manager/*"'.format(branch))
 		fab.run('unzip {0}.zip "wireless-mac-processor-{0}/mac-programs/metaMAC-program/*"'.format(branch))
 	
 		if firmware_branch != branch:
 		    fab.run('rm {0}.zip'.format(branch))
-		    fab.run('wget github.com/{1}/wireless-mac-processor/archive/{0}.zip'.format(firmware_branch,gituser))
+		    fab.run('wget --no-check-certificate github.com/{1}/wireless-mac-processor/archive/{0}.zip'.format(firmware_branch,gituser))
 
 		fab.run('unzip {0}.zip "wireless-mac-processor-{0}/wmp-engine/broadcom-metaMAC/*"'.format(firmware_branch))
 		fab.run('rm {0}.zip'.format(firmware_branch))
@@ -261,6 +261,7 @@ def run_iperf_dyn_client(server, duration,bw):
 	fab.run(cmd);
 
 @fab.task
+@fab.parallel
 def start_metamac(suite, ap_node=None, eta=0.0, cycle=False):
     if on_node(ap_node):
         suite = ap_ify(suite)
@@ -275,7 +276,6 @@ def start_metamac(suite, ap_node=None, eta=0.0, cycle=False):
 		#fab.run('~/metamac/bytecode-manager -l1 -m /root/metamac/wireless-mac-processor-aloha/mac-programs/metaMAC-program/dcf_v3-2.txt && ~/metamac/bytecode-manager -a 1')
 #		fab.run('~/metamac/bytecode-manager -l1 -m /root/metamac/wireless-mac-processor-aloha/mac-programs/metaMAC-program/aloha-slot-probability-always.txt && ~/metamac/bytecode-manager -a 1')
     	fab.run('killall -9 metamac; nohup metamac/metamac {0} -l metamac.log metamac/wireless-mac-processor-*/mac-programs/metaMAC-program/{1} > metamac.out 2> metamac.err < /dev/null &'.format(arguments, suite), pty=False)
-    fab.run('sleep 2')
 
 @fab.task
 @fab.parallel
@@ -327,7 +327,7 @@ def run_trial(trialnum, suite, ap_node):
     fab.execute(kill_metamac)
     fab.execute(start_metamac, suite, ap_node,0.25)
     fab.execute(pkt_dump,trialnum)
-    src_rate_step=[100e3,100e3,100e3,100e3,100e3,6e6]
+    src_rate_step=[50e3,50e3,50e3,50e3,50e3,50e3,50e3,50e3,6e6]
     exp_duration=30*len(src_rate_step);
     fab.execute(run_iperf_dyn_client, ap_node, exp_duration,src_rate_step, hosts=[h for h in fab.env.hosts if h.split('@')[-1] != ap_node])
     fab.execute(stop_metamac, trialnum)
