@@ -245,8 +245,20 @@ def stop_wifi():
 
 @fab.task
 @fab.parallel
-def run_iperf_client(server, duration):
-    fab.run('iperf -c 192.168.0.$(echo {0} | grep -Eo [0-9]+) -u -t {1} -b 6000000'.format(server, duration))
+def run_iperf_client(server, duration,bw):
+    fab.run('iperf -c 192.168.0.$(echo {0} | grep -Eo [0-9]+) -u -t {1} -b {2}'.format(server, duration,bw))
+
+@fab.task
+@fab.parallel
+def run_iperf_dyn_client(server, duration,bw):
+	sleep_dur=duration/len(bw)
+	cmd='';
+	dur=duration
+	for i in range(len(bw)-1):
+		cmd+='nohup iperf -c 192.168.0.$(echo {0} | grep -Eo [0-9]+) -u -t {1} -b {2} & sleep {3};'.format(server, dur,bw[i],sleep_dur)
+		dur-=sleep_dur
+	cmd+='iperf -c 192.168.0.$(echo {0} | grep -Eo [0-9]+) -u -t {1} -b {2}'.format(server,dur,bw[len(bw)-1])
+	fab.run(cmd);
 
 @fab.task
 def start_metamac(suite, ap_node=None, eta=0.0, cycle=False):
@@ -285,10 +297,12 @@ def stop_metamac(trialnum):
 @fab.task
 @fab.runs_once
 def pkt_dump(trialnum,action='run'):
-	fab.local('sudo tcpdump -i wlan0 > /dev/null &')
-	fab.local('sleep 1')
-	fab.local('sudo killall -9 tcpdump')
-	fab.local('sudo rmmod ath9k')
+    	with fab.settings(warn_only=True):
+		fab.local('sudo killall -9 tcpdump')
+		fab.local('sudo rmmod ath9k')
+	if action=='stop':
+		print ":::::::: STOP"
+		return True;
 	if action=='run':
 		fab.local('sudo modprobe ath9k')
 		fab.local('sudo rfkill unblock all')
@@ -299,6 +313,11 @@ def pkt_dump(trialnum,action='run'):
 		#fab.local('sudo tcpdump -i wlan0 net 192.168.0.0/24 and dst port 5001 | awk \'{print $2","$14}\' | sed \'s/us//\' > '+localname+'&')
 		fab.local('sudo tcpdump -i wlan0 | grep -v Ack | grep -v Beacon | grep \"IP 192.168.0\" | awk \'{print $1","$2","$14}\' | sed \'s/us//\' > '+localname+' &')
 
+def stop_pkt_dump():
+    	with fab.settings(warn_only=True):
+		fab.local('sudo killall -9 tcpdump')
+		fab.local('sudo rmmod ath9k')
+	print "PKT_DUMP STOP!!"
 
 
 @fab.task
@@ -306,13 +325,14 @@ def pkt_dump(trialnum,action='run'):
 def run_trial(trialnum, suite, ap_node):
     fab.execute(start_iperf_server, hosts=[ap_node])
     fab.execute(kill_metamac)
-    fab.execute(start_metamac, suite, ap_node)
+    fab.execute(start_metamac, suite, ap_node,0.25)
     fab.execute(pkt_dump,trialnum)
-    fab.execute(run_iperf_client, ap_node, 60, hosts=[h for h in fab.env.hosts if h.split('@')[-1] != ap_node])
+    src_rate_step=[100e3,100e3,100e3,100e3,100e3,6e6]
+    exp_duration=30*len(src_rate_step);
+    fab.execute(run_iperf_dyn_client, ap_node, exp_duration,src_rate_step, hosts=[h for h in fab.env.hosts if h.split('@')[-1] != ap_node])
     fab.execute(stop_metamac, trialnum)
     fab.execute(stop_iperf_server, hosts=[ap_node])
-
-
+    fab.execute(stop_pkt_dump)
 
 @fab.task
 def sync_date():

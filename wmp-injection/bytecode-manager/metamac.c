@@ -50,8 +50,8 @@ void update_weights(struct protocol_suite* suite, struct metamac_slot current_sl
 	if (current_slot.packet_queued) {
 		/* z represents the correct decision for this slot - transmit if the channel
 		is idle (1.0) or defer if it is busy (0.0) */
-		z = (!current_slot.channel_busy) ? 1 : 0;
-/*
+		//z = (!current_slot.channel_busy) ? 1 : 0;
+
 		if (suite->protocols[suite->active_protocol].emulator == tdma_emulate) {
 
 			z = (!current_slot.channel_busy) ? 1 : 0;
@@ -83,10 +83,10 @@ void update_weights(struct protocol_suite* suite, struct metamac_slot current_sl
 					uu=0;
 				}
 
-			//z = (!current_slot.channel_busy) ? p_curr : 1-p_curr;
+			z = (!current_slot.channel_busy) ? p_curr : 1-p_curr;
 			
 		}
-*/
+
 		for (int p = 0; p < suite->num_protocols; ++p) {
 			/* d is the decision of this component protocol - between 0 and 1 */
 			d = suite->protocols[p].emulator(suite->protocols[p].parameter, 
