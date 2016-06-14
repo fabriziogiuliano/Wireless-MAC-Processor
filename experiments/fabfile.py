@@ -215,15 +215,20 @@ def network(ap_node, mac=DEFAULT_MAC):
 
 @fab.task
 def start_iperf_server():
+
     with fab.settings(warn_only=True):
         fab.run('killall iperf')
     fab.local('sleep 3')
     fab.run('nohup iperf -i 1 -s -u -y C > iperf.out 2> iperf.err < /dev/null &', pty=False)
 
 @fab.task
-def stop_iperf_server():
+def stop_iperf_server(trialnum):
     with fab.settings(warn_only=True):
         fab.run('killall iperf')
+    fab.local('mkdir -p data')
+    localname = 'data/{0}-iperf-{1}-{2}.csv'.format(datetime.date.today(), fab.env.host_string.split('@')[-1], trialnum)
+    with fab.settings(warn_only=True):
+        fab.get(remote_path='iperf.out', local_path=localname)
 
 @fab.task
 @fab.parallel
@@ -313,6 +318,7 @@ def pkt_dump(trialnum,action='run'):
 		#fab.local('sudo tcpdump -i wlan0 net 192.168.0.0/24 and dst port 5001 | awk \'{print $2","$14}\' | sed \'s/us//\' > '+localname+'&')
 		fab.local('sudo tcpdump -i wlan0 | grep -v Ack | grep -v Beacon | grep \"IP 192.168.0\" | awk \'{print $1","$2","$14}\' | sed \'s/us//\' > '+localname+' &')
 
+@fab.task
 def stop_pkt_dump():
     	with fab.settings(warn_only=True):
 		fab.local('sudo killall -9 tcpdump')
@@ -328,10 +334,12 @@ def run_trial(trialnum, suite, ap_node):
     fab.execute(start_metamac, suite, ap_node,0.25)
     fab.execute(pkt_dump,trialnum)
     src_rate_step=[50e3,50e3,50e3,50e3,50e3,50e3,50e3,50e3,6e6]
+    #src_rate_step=[100e3]
+    #src_rate_step=[6e6]
     exp_duration=30*len(src_rate_step);
     fab.execute(run_iperf_dyn_client, ap_node, exp_duration,src_rate_step, hosts=[h for h in fab.env.hosts if h.split('@')[-1] != ap_node])
     fab.execute(stop_metamac, trialnum)
-    fab.execute(stop_iperf_server, hosts=[ap_node])
+    fab.execute(stop_iperf_server, trialnum, hosts=[ap_node])
     fab.execute(stop_pkt_dump)
 
 @fab.task

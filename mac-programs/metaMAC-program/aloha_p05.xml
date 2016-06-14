@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<metamac eta="1.0" initial-protocol="0">
+	<protocol id="2" name="Aloha (p=0.5)">
+		<fsm path="aloha-slot-probability-always.txt">
+			<param num="14" value="32767"/>
+		</fsm>
+		<emulator type="aloha">
+			<param key="persistence" value="0.5"/>
+		</emulator>
+	</protocol>
+</metamac>
