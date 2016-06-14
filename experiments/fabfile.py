@@ -227,8 +227,12 @@ def stop_iperf_server(trialnum):
         fab.run('killall iperf')
     fab.local('mkdir -p data')
     localname = 'data/{0}-iperf-{1}-{2}.csv'.format(datetime.date.today(), fab.env.host_string.split('@')[-1], trialnum)
+    localname_f = 'data/{0}-iperf_f-{1}-{2}.csv'.format(datetime.date.today(), fab.env.host_string.split('@')[-1], trialnum)
     with fab.settings(warn_only=True):
+	fab.run('cat iperf.out | grep "0,-" | grep -v nan > iperf2.out')
         fab.get(remote_path='iperf.out', local_path=localname)
+        fab.get(remote_path='iperf2.out', local_path=localname_f)
+	fab.run('rm iperf2.out')
 
 @fab.task
 @fab.parallel
@@ -333,10 +337,10 @@ def run_trial(trialnum, suite, ap_node):
     fab.execute(kill_metamac)
     fab.execute(start_metamac, suite, ap_node,0.25)
     fab.execute(pkt_dump,trialnum)
-    src_rate_step=[50e3,50e3,50e3,50e3,50e3,50e3,50e3,50e3,6e6]
+    src_rate_step=[100e3,190e3,200e3,400e3,6e6]
     #src_rate_step=[100e3]
     #src_rate_step=[6e6]
-    exp_duration=30*len(src_rate_step);
+    exp_duration=15*len(src_rate_step);
     fab.execute(run_iperf_dyn_client, ap_node, exp_duration,src_rate_step, hosts=[h for h in fab.env.hosts if h.split('@')[-1] != ap_node])
     fab.execute(stop_metamac, trialnum)
     fab.execute(stop_iperf_server, trialnum, hosts=[ap_node])
