@@ -83,7 +83,7 @@ void update_weights(struct protocol_suite* suite, struct metamac_slot current_sl
 					uu=0;
 				}
 
-			//z = (!current_slot.channel_busy) ? p_curr : 1-p_curr;
+			z = (!current_slot.channel_busy) ? p_curr : 1-p_curr;
 			
 		}
 

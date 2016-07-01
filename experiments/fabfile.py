@@ -193,7 +193,7 @@ def associate(mac=DEFAULT_MAC):
     fab.run('modprobe b43 qos=0')
     fab.run('ifconfig wlan0 192.168.0.$(hostname | grep -Eo [0-9]+) netmask 255.255.255.0')
     fab.run('iwconfig wlan0 essid alix-ap')
-    fab.run('iwconfig wlan0 txpower 20dbm')
+    fab.run('iwconfig wlan0 txpower 15dbm')
     result = fab.run('iwconfig wlan0 | grep Access | awk \'{ print $4 }\';')
     attempts = 0
     while 'Not-Associated' in result and attempts < 10:
@@ -337,13 +337,14 @@ def run_trial(trialnum, suite, ap_node):
     fab.execute(kill_metamac)
     fab.execute(start_metamac, suite, ap_node,0.25)
     fab.execute(pkt_dump,trialnum)
-    src_rate_step=[100e3,190e3,200e3,400e3,6e6]
+    src_rate_step=[10e3,190e3,200e3,400e3,6e6]
     #src_rate_step=[100e3]
     #src_rate_step=[6e6]
-    exp_duration=15*len(src_rate_step);
+    exp_duration=30*len(src_rate_step);
     fab.execute(run_iperf_dyn_client, ap_node, exp_duration,src_rate_step, hosts=[h for h in fab.env.hosts if h.split('@')[-1] != ap_node])
     fab.execute(stop_metamac, trialnum)
     fab.execute(stop_iperf_server, trialnum, hosts=[ap_node])
+    fab.execute(stop_iperf)
     fab.execute(stop_pkt_dump)
 
 @fab.task
