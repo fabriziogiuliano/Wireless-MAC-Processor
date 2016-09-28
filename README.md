@@ -1,9 +1,12 @@
-Wireless-MAC-Processor
-======================
+METAMAC implementation through Wireless-MAC-Processor
+=====================================================
 
-Wireless MAC Processor and tools
+This repository contains all stuff able to run METAMAC protocol on Wireless MAC Processor
 
-FLAVIA has publicly released a Wireless MAC Processor implementation on a specific commercial wireless card. Documentation describing the API available on this webiste (i.e. the list of events, actions and conditions to be used for defining MAC programs) and some tools for developing and debugging MAC state machines have been provided.
+The how to to run a demo of the implementation is present in the directory experiments.
+
+Information about WMP: FLAVIA has publicly released a Wireless MAC Processor implementation on a specific commercial wireless card.
+Documentation describing the API available on this webiste (i.e. the list of events, actions and conditions to be used for defining MAC programs) and some tools for developing and debugging MAC state machines have been provided.
 
 To enjoy programming your MAC download and run the following components:
 * the WMP Editor (graphical tool), for programming a new MAC protocol in terms of state machine;

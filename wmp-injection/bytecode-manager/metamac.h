@@ -14,7 +14,8 @@ typedef enum {
 	FLAG_READONLY = 4,
 	FLAG_CYCLE = 8,
 	FLAG_ETA_OVERRIDE = 16,
-	FLAG_USE_BUSY = 32
+	FLAG_USE_BUSY = 32,
+	FLAG_REMOTE_LOGGING = 64
 } metamac_flag_t;
 
 struct metamac_slot {
@@ -102,8 +103,12 @@ void metamac_init(struct debugfs_file * df, struct protocol_suite *suite, metama
 
 int metamac_read_loop(struct metamac_queue *queue, struct debugfs_file *df,
 	metamac_flag_t flags, int slot_time, int read_interval);
+
+int socket_commands_receive(struct metamac_queue *queue, struct debugfs_file *df,
+	metamac_flag_t flags, int *fixed_protocol, struct protocol_suite *suite);
+
 int metamac_process_loop(struct metamac_queue *queue, struct debugfs_file *df,
-	struct protocol_suite *suite, metamac_flag_t flags, const char *logpath);
+	struct protocol_suite *suite, metamac_flag_t flags, const char *logpath, int *fixed_protocol, const char *logging_server);
 
 extern volatile int metamac_loop_break;
 

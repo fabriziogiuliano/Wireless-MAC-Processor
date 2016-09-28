@@ -315,7 +315,7 @@ void read_protocol(struct protocol *proto, xmlNode *protocol_node, const char *f
 	xmlFree(type);
 }
 
-struct protocol_suite *read_config(const char *program_name, struct arguments *arguments)
+void read_config(struct protocol_suite *suite, const char *program_name, struct arguments *arguments)
 {
 	xmlDoc *doc = xmlParseFile(arguments->config);
 	if (!doc) {
@@ -359,11 +359,13 @@ struct protocol_suite *read_config(const char *program_name, struct arguments *a
 		errx(EXIT_FAILURE, "Invalid configuration file: %s\n", "There must be at least one component protocol.");
 	}
 
+	/*
 	struct protocol_suite *suite = (struct protocol_suite*)malloc(sizeof(struct protocol_suite));
 	if (suite == NULL) {
 		err(EXIT_FAILURE, "Unable to allocate memory");
 	}
-
+	*/
+	
 	init_protocol_suite(suite, num_protocols, eta, arguments->metamac_flags);
 
 	int prefix_len;
@@ -397,5 +399,5 @@ struct protocol_suite *read_config(const char *program_name, struct arguments *a
 	}
 	
 	xmlFreeDoc(doc);
-	return suite;
+	return;
 }

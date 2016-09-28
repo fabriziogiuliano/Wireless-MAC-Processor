@@ -7,6 +7,12 @@
 #include <stdint.h>
 #include <string.h>
 
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#define BUFFSIZE 255
+void Die(char *mess) { perror(mess); exit(1); }
+
 #include "metamac.h"
 #include "protocols.h"
 #include "vars.h"
@@ -92,7 +98,7 @@ void update_weights(struct protocol_suite* suite, struct metamac_slot current_sl
 			d = suite->protocols[p].emulator(suite->protocols[p].parameter, 
 				current_slot.slot_num, suite->slot_offset, suite->last_slot);
 			
-			fprintf(stderr,"[%d] uu=%e,d=%e,z=%e,p_curr=%e\n",p,uu,d,z,p_curr);
+			//fprintf(stderr,"[%d] uu=%e,d=%e,z=%e,p_curr=%e\n",p,uu,d,z,p_curr);
 			suite->weights[p] *= exp(-(suite->eta) * fabs(d - z));
 			suite->weights[p]=suite->weights[p]<0.01?0.01:suite->weights[p];
 		}
@@ -152,6 +158,7 @@ void free_protocol_suite(struct protocol_suite *suite)
 void configure_params(struct debugfs_file *df, int slot, struct fsm_param *param)
 {
 	while (param != NULL) {
+		//printf("Set parameters num : %d - value %d - with slot %d\n", param->num, param->value, slot);
 		set_parameter(df, slot, param->num, param->value);
 		param = param->next;
 	}
@@ -211,12 +218,15 @@ static void metamac_display(unsigned long loop, struct protocol_suite *suite)
 		printf("\x1b[%dF", suite->num_protocols);
 	}
 
+
+
 	int i;
 	for (i = 0; i < suite->num_protocols; i++) {
 		printf("%c %5.3f %s\n",
 			suite->active_protocol == i ? '*' : ' ',
 			suite->weights[i],
 			suite->protocols[i].name);
+
 	}
 }
 
@@ -225,6 +235,8 @@ static void load_protocol(struct debugfs_file *df, struct protocol_suite *suite,
 	struct options opt;
 	int active = suite->active_slot; // Always 0 or 1 since metamac_init will already have run.
 	int inactive = 1 - active;
+	
+	//printf(" before load -- active_protocol : %d - next protocol : %d\n", suite->active_protocol, protocol);
 
 	if (protocol == suite->slots[active]) {
 		/* This protocol is already running. */
@@ -238,6 +250,7 @@ static void load_protocol(struct debugfs_file *df, struct protocol_suite *suite,
 	} else if (suite->slots[active] >= 0 &&
 			strcmp(suite->protocols[protocol].fsm_path,
 			suite->protocols[suite->slots[active]].fsm_path) == 0) {
+	  
 		/* Protocol in active slot shares same FSM, but is not the same protocol
 		(already checked). Write the parameters for this protocol. */
 		configure_params(df, active, suite->protocols[protocol].fsm_params);
@@ -270,6 +283,9 @@ static void load_protocol(struct debugfs_file *df, struct protocol_suite *suite,
 
 	suite->active_protocol = protocol;
 	clock_gettime(CLOCK_MONOTONIC_RAW, &suite->last_update);
+	
+	//printf(" after load -- active_protocol : %d - next protocol : %d\n", suite->active_protocol, protocol);
+
 }
 
 static void metamac_evaluate(struct debugfs_file *df, struct protocol_suite *suite)
@@ -427,8 +443,102 @@ int metamac_read_loop(struct metamac_queue *queue, struct debugfs_file *df,
 	return metamac_loop_break;
 }
 
+
+
+int socket_commands_receive(struct metamac_queue *queue, struct debugfs_file *df, metamac_flag_t flags, int *fixed_protocol, struct protocol_suite *suite)
+{
+
+    char command[BUFFSIZE];
+  
+    int sock;
+    struct sockaddr_in echoserver;
+    struct sockaddr_in echoclient;
+    char buffer[BUFFSIZE];
+    unsigned int echolen, clientlen, serverlen;
+    int received = 0;
+	/* Create the UDP socket */
+    if ((sock = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0) {
+    	Die("Failed to create socket");
+    }
+
+    /* Construct the server sockaddr_in structure */
+    memset(&echoserver, 0, sizeof(echoserver));       /* Clear struct */
+    echoserver.sin_family = AF_INET;                  /* Internet/IP */
+    echoserver.sin_addr.s_addr = htonl(INADDR_ANY);   /* Any IP address */
+    echoserver.sin_port = htons(atoi("8400"));       /* server port */
+
+    /* Bind the socket */
+    serverlen = sizeof(echoserver);
+    if (bind(sock, (struct sockaddr *) &echoserver, serverlen) < 0) {
+    	Die("Failed to bind server socket");
+    }
+
+    printf("start command server\n");
+    while (metamac_loop_break == 0) {
+
+	  /* Receive a message from the client */
+	  clientlen = sizeof(echoclient);
+	  if ((received = recvfrom(sock, buffer, BUFFSIZE, 0,
+                                       (struct sockaddr *) &echoclient,
+                                       &clientlen)) < 0) {
+                Die("Failed to receive message");
+	  }
+	  printf("Client connected: %s - message : %s\n", inet_ntoa(echoclient.sin_addr), buffer);
+
+	  //{"username":"ece","says":"hello"}
+	  //sscanf(data, "{\"username\":\"%[^\"]\",\"says\":\"%s\"}", name, msg);
+	  //[{"command":"slot1"}]
+	  sscanf(buffer, "[{\"command\":\"%[^\"]\"}]", command);
+	  /* Send the message back to client */
+	  /*if (sendto(sock, buffer, received, 0,
+			  (struct sockaddr *) &echoclient,
+			  sizeof(echoclient)) != received) {
+		  Die("Mismatch in number of echo'd bytes");
+	  }*/
+
+	  /* fixed_protocol = 0:metamac 1:protocol0 2:protocol1 3:protocol2 4:protocol3
+	   * active_protocol = 0:protocol0 1:protocol1 2:protocol2 3:protocol3
+	   */
+	  
+	  if ( strcmp(command, "METAMAC") == 0 ) {
+	    printf("metamac\n");
+	    *fixed_protocol = 0;
+	  }
+	  if ( strcmp(command, "Protocol 1") == 0 || strcmp(command, "TDMA 1") == 0) {
+	    printf("1\n");
+	    *fixed_protocol = 1;
+	    load_protocol(df, suite, 0);
+	  }
+	  if ( strcmp(command, "Protocol 2") == 0 || strcmp(command, "TDMA 2") == 0) {
+	    printf("2\n");
+	    *fixed_protocol = 2;
+	    load_protocol(df, suite, 1);
+	  }
+	  if ( strcmp(command, "Protocol 3") == 0 || strcmp(command, "TDMA 3") == 0) {
+	    printf("3\n");
+	    *fixed_protocol = 3;
+	    load_protocol(df, suite, 2);
+	  }
+	  if ( strcmp(command, "Protocol 4") == 0 || strcmp(command, "TDMA 4") == 0) {
+	    printf("4\n");
+	    *fixed_protocol = 4;
+	    load_protocol(df, suite, 3);
+	  }
+	  if ( strcmp(command, "Protocol 5") == 0 || strcmp(command, "ALOHA") == 0) {
+	    printf("4\n");
+	    *fixed_protocol = 5;
+	    load_protocol(df, suite, 4);
+	  }
+	  
+
+
+    }
+    return metamac_loop_break;
+}
+
+
 int metamac_process_loop(struct metamac_queue *queue, struct debugfs_file *df,
-	struct protocol_suite *suite, metamac_flag_t flags, const char *logpath)
+	struct protocol_suite *suite, metamac_flag_t flags, const char *logpath, int *fixed_protocol, const char * logging_server)
 {
 	FILE * logfile;
 	if (flags & FLAG_LOGGING) {
@@ -447,6 +557,37 @@ int metamac_process_loop(struct metamac_queue *queue, struct debugfs_file *df,
 		logfile = NULL;
 	}
 
+	
+	
+	
+	
+	
+	//c socket variables for client
+	int sock;
+	struct sockaddr_in echoserver;
+        struct sockaddr_in echoclient;
+        char buffer[BUFFSIZE];
+        unsigned int echolen, clientlen;
+        int received = 0;
+	/* Create the UDP socket */
+        if ((sock = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0) {
+	  Die("Failed to create socket");
+        }
+        /* Construct the server sockaddr_in structure */
+        memset(&echoserver, 0, sizeof(echoserver));       /* Clear struct */
+        echoserver.sin_family = AF_INET;                  /* Internet/IP */
+ 
+          echoserver.sin_addr.s_addr = inet_addr(logging_server);  /* IP address */
+ //         echoserver.sin_port = htons(atoi(argv[3]));       /* server port */
+         
+	  //echoserver.sin_addr.s_addr = inet_addr("10.8.8.6");  /* IP address */
+         //echoserver.sin_addr.s_addr = inet_addr("10.8.19.1");  /* IP address */
+         echoserver.sin_port = htons(atoi("4321"));       /* server port */
+
+	
+	
+	
+	
 	unsigned long loop = 0;
 	struct timespec last_update_time;
 	clock_gettime(CLOCK_MONOTONIC_RAW, &last_update_time);
@@ -462,6 +603,7 @@ int metamac_process_loop(struct metamac_queue *queue, struct debugfs_file *df,
 		struct metamac_slot slots[16];
 		size_t count = queue_multipop(queue, slots, ARRAY_SIZE(slots));
 		for (int i = 0; i < count; i++) {
+			//evaluate the best protocol
 			update_weights(suite, slots[i]);
 
 			count_transmitted+=slots[i].transmitted;
@@ -506,7 +648,7 @@ int metamac_process_loop(struct metamac_queue *queue, struct debugfs_file *df,
 			+ (current_time.tv_nsec - last_update_time.tv_nsec) / 1000L;
 
 		/* Update running protocol. */
-		if (!(flags & FLAG_READONLY)) {
+		if (!(flags & FLAG_READONLY) && (*fixed_protocol == 0)) {
 			metamac_evaluate(df, suite);
 		}
 
@@ -520,6 +662,21 @@ int metamac_process_loop(struct metamac_queue *queue, struct debugfs_file *df,
 			count_transmit_success_ = count_transmit_success; 
 			if (flags & FLAG_VERBOSE) {
 				metamac_display(loop++, suite);
+			}
+			if (flags & FLAG_REMOTE_LOGGING) {
+				/* Send the word to the server */
+ 				int ii;
+				sprintf(buffer, "{\"active\" : \"%d\"", suite->active_protocol); 
+				for (ii = 0; ii < suite->num_protocols; ii++) {
+				      sprintf(buffer, "%s, \"%d\":[\"%5.3f\", \"%s\"]", buffer, ii, suite->weights[ii], suite->protocols[ii].name);
+				}
+				sprintf(buffer, "%s}", buffer); 
+				//printf("%s\n", buffer);
+				echolen = strlen(buffer);
+ 				if (sendto(sock, buffer, echolen, 0, (struct sockaddr *) &echoserver, sizeof(echoserver)) != echolen) {
+ 				    Die("Mismatch in number of sent bytes");	
+ 				}
+				
 			}
 
 			last_update_time = current_time;

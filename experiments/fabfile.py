@@ -2,6 +2,7 @@
 '''Utilities for performing Metamac experiments.
 Requires Python 2.X for Fabric.
 Author: Nathan Flick
+Improved: Domenico Garlisi
 '''
 
 import os
@@ -10,6 +11,54 @@ import datetime
 
 import fabric.api as fab
 import fabric.utils
+
+
+
+''' 
+tool usage:
+
+SETUP
+def setup_local(get_src=True, debug=False):
+fab -u root -H alix02,alix03,alix04,alix05,alix15 setup_local:1,0
+
+NETWORK
+fab -u root -H alix02,alix03,alix04,alix05,alix15 network:alix02
+
+METAMAC TDMA
+fab -u root -H alix02,alix03,alix04,alix05,alix15 run_trial:tdma-1,tdma-4.xml,alix02,0.25
+metamac/metamac -l metamac.log metamac/wireless-mac-processor/mac-programs/metaMAC-program/tdma-4.xml -g 10.8.8.6 -v -e 0.25
+metamac/metamac metamac/wireless-mac-processor/mac-programs/metaMAC-program/tdma-4.xml -g 10.8.8.6 -v -e 0.25
+fab -u root -H alix03,alix04,alix05,alix15 stop_metamac:tdma-1
+
+METAMAC ALOHA
+fab -u root -H alix02,alix03,alix04,alix05,alix15 run_trial:tdma-aloha,tdma-aloha_p04.xml,alix02,0.25
+metamac/metamac -l metamac.log metamac/wireless-mac-processor/mac-programs/metaMAC-program/tdma-aloha_075.xml -g 10.8.8.6 -v -e 0.25
+metamac/metamac metamac/wireless-mac-processor/mac-programs/metaMAC-program/tdma-aloha_075.xml -g 10.8.8.6 -v -e 0.25
+fab -u root -H alix03,alix04,alix05,alix15 stop_metamac:tdma-aloha-1
+
+METAMAC ALOHA GOOD WORK
+fab -u root -H alix02,alix03,alix04,alix05,alix15 run_trial:tdma-aloha,tdma-4-wintech-09.xml,alix02,0.5
+metamac/metamac -v -g 10.8.8.6  metamac/wireless-mac-processor/mac-programs/metaMAC-program/tdma-4-wintech-09.xml -e 0.5
+metamac/metamac -v -g 10.8.8.10  metamac/wireless-mac-processor/mac-programs/metaMAC-program/tdma-4-wintech-09.xml -e 0.5
+fab -u root -H alix03,alix04,alix05,alix15 stop_metamac:tdma-aloha
+
+TRAFFIC
+fab -u root -H alix02 start_iperf_server:0
+fab -u root -H alix03,alix04,alix05,alix15 start_iperf_client:alix02,600,2M,1200
+fab -u root -H alix02,alix03,alix04,alix05,alix15 stop_iperf
+
+TRAFFIC
+iperf -c 192.168.0.2 -i 1 -t 600 -p 8484 -b 1.5M -l 1200
+iperf -s -u -p 8484 -i 1
+
+
+
+GOOD WORK
+metamac/metamac -v -g 10.8.8.6  metamac/wireless-mac-processor/mac-programs/metaMAC-program/tdma-4-wintech-09.xml -e 0.5
+
+'''
+
+
 
 DEFAULT_MAC = 'tdma-4.txt'
 
@@ -49,7 +98,7 @@ def load_b43():
 
 @fab.task
 @fab.parallel
-def setup(branch='metamac', get_src=False,firmware_branch=None, debug=False,gituser='fabriziogiuliano'):
+def setup(branch='metamac', get_src=False, firmware_branch=None, debug=False, gituser='fabriziogiuliano'):
 
     '''Sets up the node by downloading the specified branch or commit and extracting necessary
     files, installing the WMP firmware, and building needed tools.
@@ -57,6 +106,7 @@ def setup(branch='metamac', get_src=False,firmware_branch=None, debug=False,gitu
 
     if firmware_branch is None:
         firmware_branch = branch
+    
     if get_src:
 	    with fab.cd('/tmp'):
 		fab.run('rm -f *.deb')
@@ -77,6 +127,8 @@ def setup(branch='metamac', get_src=False,firmware_branch=None, debug=False,gitu
 
 		fab.run('unzip {0}.zip "wireless-mac-processor-{0}/wmp-engine/broadcom-metaMAC/*"'.format(firmware_branch))
 		fab.run('rm {0}.zip'.format(firmware_branch))
+      
+    
     with fab.cd('metamac/wireless-mac-processor-{0}/wmp-engine/broadcom-metaMAC/'.format(firmware_branch)):
         fab.run('cp ucode5.fw b0g0bsinitvals5.fw b0g0initvals5.fw /lib/firmware/b43')
         with fab.settings(warn_only=True):
@@ -95,52 +147,55 @@ def setup(branch='metamac', get_src=False,firmware_branch=None, debug=False,gitu
         fab.run('cp -f bytecode-manager ~/metamac/')
         fab.run('cp -f metamac ~/metamac/')
         fab.run('cp -f tsfrecorder ~/metamac/')
+
+
 @fab.task
 @fab.parallel
-def setup_local(branch='metamac', get_src=True,firmware_branch=None, debug=False):
+def setup_local(get_src=True, debug=False):
 
     '''Sets up the node by downloading the specified branch or commit and extracting necessary
     files, installing the WMP firmware, and building needed tools.
     '''
-
-    if firmware_branch is None:
-        firmware_branch = branch
+    
     if get_src:
-	    with fab.cd('/tmp'):
-		fab.run('rm -f *.deb')
-		fab.run('wget http://security.ubuntu.com/ubuntu/pool/main/libx/libxml2/libxml2_2.9.1+dfsg1-3ubuntu4_i386.deb')
-		fab.run('wget http://security.ubuntu.com/ubuntu/pool/main/libx/libxml2/libxml2-dev_2.9.1+dfsg1-3ubuntu4_i386.deb')
-		fab.run('dpkg -i *.deb')
-		fab.run('rm -f *.deb')
+	    #with fab.cd('/tmp'):
+		#fab.run('rm -f *.deb')
+		#fab.run('wget http://security.ubuntu.com/ubuntu/pool/main/libx/libxml2/libxml2_2.9.1+dfsg1-3ubuntu4_i386.deb')
+		#fab.run('wget http://security.ubuntu.com/ubuntu/pool/main/libx/libxml2/libxml2-dev_2.9.1+dfsg1-3ubuntu4_i386.deb')
+		#fab.run('dpkg -i *.deb')
+		#fab.run('rm -f *.deb')
 
 	    fab.run('rm -rf metamac && mkdir metamac')
 	    with fab.cd('metamac'):
-		wmp_dir='wireless-mac-processor-{0}/'.format(branch);
-	    	fab.run('mkdir {0} && mkdir {0}/wmp-injection'.format(wmp_dir));
-		fab.put(local_path='git/wireless-mac-processor/wmp-injection/*',remote_path='wireless-mac-processor-{0}/wmp-injection/'.format(branch));
+		wmp_dir='wireless-mac-processor';
+	    	fab.run('mkdir {0} && mkdir {0}/wmp-injection &&  mkdir {0}/wmp-injection/bytecode-manager'.format(wmp_dir));
+		fab.put(local_path='../../wireless-mac-processor/wmp-injection/bytecode-manager/*',remote_path='wireless-mac-processor/wmp-injection/bytecode-manager');
 		
-	    	fab.run('mkdir {0}/mac-programs && mkdir {0}/mac-prorams/metaMAC-program/'.format(wmp_dir));
-		fab.put(local_path='git/wireless-mac-processor/mac-programs/metaMAC-program/*',remote_path='wireless-mac-processor-{0}/mac-programs/metaMAC-program/'.format(branch) );
-
-
-    fab.put(local_path='git/meta-MAC/wmp-firmware/wmp3-2.28/*.fw',remote_path='/lib/firmware/b43/');
-    with fab.settings(warn_only=True):
-    	fab.run('rmmod b43')
-    fab.run('sleep 1')
-    fab.run('modprobe b43 qos=0')
-    fab.run('sleep 1')
-
-    with fab.cd('~/metamac/wireless-mac-processor-{0}/wmp-injection/bytecode-manager/'.format(branch)):
+	    	fab.run('mkdir {0}/mac-programs && mkdir {0}/mac-programs/metaMAC-program'.format(wmp_dir));
+		fab.put(local_path='../../wireless-mac-processor/mac-programs/metaMAC-program/*',remote_path='wireless-mac-processor/mac-programs/metaMAC-program/' );
+       
+    with fab.cd('~/metamac/wireless-mac-processor/wmp-injection/bytecode-manager/'):
         if debug:
             fab.run("sed -i 's/CFLAGS=/CFLAGS=-g /' Makefile")
             fab.run("sed -i 's/-O[0-9]/ /' Makefile")
+        fab.run('make clean')
         fab.run('make bytecode-manager')
         fab.run('make metamac')
-        fab.run('make tsfrecorder')
+        #fab.run('make tsfrecorder')
         fab.run('cp -f bytecode-manager ~/metamac/')
         fab.run('cp -f metamac ~/metamac/')
-        fab.run('cp -f tsfrecorder ~/metamac/')
+        #fab.run('cp -f tsfrecorder ~/metamac/')
 
+    #fab.put(local_path='git/meta-MAC/wmp-firmware/wmp3-2.28/*.fw',remote_path='/lib/firmware/b43/');
+    fab.put(local_path='../../wireless-mac-processor/wmp-engine/broadcom-metaMAC/v2/*.fw',remote_path='/lib/firmware/b43/');
+    
+    with fab.settings(warn_only=True):
+    	fab.run('rmmod b43')
+    fab.run('sleep 0.5')
+    fab.run('modprobe b43 qos=0')
+    fab.run('sleep 0.5')
+    fab.run('ifconfig wlan0 up')
+    
 @fab.task
 @fab.parallel
 def reboot():
@@ -164,24 +219,35 @@ def load_mac(mac, ap_node=None):
     fab.run('metamac/bytecode-manager -l 1 -m ~/metamac/wireless-mac-processor-*/mac-programs/metaMAC-program/{0}'.format(mac))
     fab.run('metamac/bytecode-manager -a 1')
 
+
+#MANAGED NETWORK
+
 @fab.task
 def start_ap(mac):
-    #fab.run('ifconfig wlan0 192.168.0.$(hostname | grep -Eo [0-9]+) netmask 255.255.255.0 up')
-    #load_mac(mac)
+    
     with fab.settings(warn_only=True):
     	fab.run('killall -9 hostapd')
     	fab.run('killall -9 metamac')
     fab.run('scp ~/work/openfwwf-5.2/*.fw /lib/firmware/b43/')
+    
     with fab.cd('work/association'):
         fab.run('if ! grep basic_rates=60 hostapd.conf; then echo "basic_rates=60" >> hostapd.conf; fi')
         fab.run('if ! grep supported_rates=60 hostapd.conf; then echo "supported_rates=60" >> hostapd.conf; fi')
+                
+        #fab.run('if ! grep basic_rates=20 hostapd.conf; then echo "basic_rates=20" >> hostapd.conf; fi')
+        #fab.run('if ! grep "supported_rates=20 55 60 90 110 120 180 240 360 480 540" hostapd.conf; then echo "supported_rates=20 55 60 90 110 120 180 240 360 480 540" >> hostapd.conf; fi')
+        
         fab.run("sed -i 's/macaddr_acl=1/macaddr_acl=0/' hostapd.conf")
         fab.run("sed -i 's/channel=11/channel=6/' hostapd.conf")
+        #fab.run("sed -i 's/channel=6/channel=11/' hostapd.conf")
+
+        fab.run("sed -i 's/ssid=alix-ap/ssid=metamac-ap/' hostapd.conf")
+        fab.run("sed -i 's/wme_enabled=1/wme_enabled=0/' hostapd.conf")
+        
     # Must not be prefixed with cd work/association or else the cd will interfere with nohup.
     fab.run('nohup work/association/up-hostapd.sh work/association/hostapd.conf 192.168.0.$(hostname | grep -Eo [0-9]+) >& hostapd.log < /dev/null &', pty=False)
-    fab.run('sleep 4')
-    #load_mac(mac)
-
+    fab.run('sleep 2')
+    
 @fab.task
 @fab.parallel
 def associate(mac=DEFAULT_MAC):
@@ -192,17 +258,18 @@ def associate(mac=DEFAULT_MAC):
 	fab.run('rmmod b43')
     fab.run('modprobe b43 qos=0')
     fab.run('ifconfig wlan0 192.168.0.$(hostname | grep -Eo [0-9]+) netmask 255.255.255.0')
-    fab.run('iwconfig wlan0 essid alix-ap')
+    fab.run('iwconfig wlan0 essid metamac-ap')
     fab.run('iwconfig wlan0 txpower 15dbm')
     result = fab.run('iwconfig wlan0 | grep Access | awk \'{ print $4 }\';')
     attempts = 0
     while 'Not-Associated' in result and attempts < 10:
-        fab.run('iwconfig wlan0 essid alix-ap')
+        fab.run('iwconfig wlan0 essid metamac-ap')
         fab.run('sleep 1')
         result = fab.run('iwconfig wlan0 | grep Access | awk \'{ print $4 }\';')
         attempts += 1
     if attempts >= 10:
         fabric.utils.abort('Could not associate node {0} with access point.'.format(fab.env.host_string))
+    fab.run('iwconfig wlan0 rate 6M fixed')
     #load_mac(mac)
 
 @fab.task
@@ -213,13 +280,51 @@ def network(ap_node, mac=DEFAULT_MAC):
     fab.execute(start_ap, ap_ify(mac), hosts=[h for h in fab.env.hosts if h.split('@')[-1] == ap_node])
     fab.execute(associate, mac, hosts=[h for h in fab.env.hosts if h.split('@')[-1] != ap_node])
 
-@fab.task
-def start_iperf_server():
 
+@fab.task
+@fab.parallel
+def stop_hostapd():
+    with fab.settings(warn_only=True):
+        fab.run('killall -9 hostapd')
+
+@fab.task
+@fab.parallel
+def stop_wifi():
+    with fab.settings(warn_only=True):
+        fab.run('rmmod b43')
+
+
+
+#MANAGED TRAFFIC
+
+@fab.task
+def start_iperf_server(logging='1'):
     with fab.settings(warn_only=True):
         fab.run('killall iperf')
-    fab.local('sleep 3')
-    fab.run('nohup iperf -i 1 -s -u -y C > iperf.out 2> iperf.err < /dev/null &', pty=False)
+    fab.local('sleep 1')
+    if logging=='1':
+      fab.run('nohup iperf -i 1 -s -u -y C > iperf.out 2> iperf.err < /dev/null &', pty=False)
+    else:
+      fab.run('nohup iperf -s -u > iperf.out 2> iperf.err < /dev/null &', pty=False)
+
+@fab.task
+@fab.parallel
+def start_iperf_client(server, duration, bw, length):
+    with fab.settings(warn_only=True):
+        fab.run('killall iperf')
+    fab.run('nohup iperf -c 192.168.0.$(echo {0} | grep -Eo [0-9]+) -u -t {1} -b {2} -l {3} > iperf.out 2> iperf.err < /dev/null &'.format(server, duration, bw, length), pty=False)
+
+@fab.task
+@fab.parallel
+def start_iperf_dyn_client(server, duration,bw):
+	sleep_dur=duration/len(bw)
+	cmd='';
+	dur=duration
+	for i in range(len(bw)-1):
+		cmd+='nohup iperf -c 192.168.0.$(echo {0} | grep -Eo [0-9]+) -u -t {1} -b {2} & sleep {3};'.format(server, dur,bw[i], sleep_dur)
+		dur-=sleep_dur
+	cmd+='iperf -c 192.168.0.$(echo {0} | grep -Eo [0-9]+) -u -t {1} -b {2}'.format(server,dur,bw[len(bw)-1])
+	fab.run(cmd);
 
 @fab.task
 def stop_iperf_server(trialnum):
@@ -240,38 +345,13 @@ def stop_iperf():
     with fab.settings(warn_only=True):
         fab.run('killall -9 iperf')
 
-@fab.task
-@fab.parallel
-def stop_hostapd():
-    with fab.settings(warn_only=True):
-        fab.run('killall -9 hostapd')
+
+
+#MANAGED METAMAC
 
 @fab.task
 @fab.parallel
-def stop_wifi():
-    with fab.settings(warn_only=True):
-        fab.run('rmmod b43')
-
-@fab.task
-@fab.parallel
-def run_iperf_client(server, duration,bw):
-    fab.run('iperf -c 192.168.0.$(echo {0} | grep -Eo [0-9]+) -u -t {1} -b {2}'.format(server, duration,bw))
-
-@fab.task
-@fab.parallel
-def run_iperf_dyn_client(server, duration,bw):
-	sleep_dur=duration/len(bw)
-	cmd='';
-	dur=duration
-	for i in range(len(bw)-1):
-		cmd+='nohup iperf -c 192.168.0.$(echo {0} | grep -Eo [0-9]+) -u -t {1} -b {2} & sleep {3};'.format(server, dur,bw[i],sleep_dur)
-		dur-=sleep_dur
-	cmd+='iperf -c 192.168.0.$(echo {0} | grep -Eo [0-9]+) -u -t {1} -b {2}'.format(server,dur,bw[len(bw)-1])
-	fab.run(cmd);
-
-@fab.task
-@fab.parallel
-def start_metamac(suite, ap_node=None, eta=0.0, cycle=False):
+def start_metamac(suite, ap_node=None, eta=0.0, cycle=False, remote_logging='10.8.8.6'):
     if on_node(ap_node):
         suite = ap_ify(suite)
     arguments = ''
@@ -279,12 +359,15 @@ def start_metamac(suite, ap_node=None, eta=0.0, cycle=False):
         arguments += '-c '
     if eta > 0.0:
         arguments += '-e {0} '.format(eta)
+    if remote_logging:
+	arguments += '-g {0} '.format(remote_logging)
     if not on_node(ap_node):
 	with fab.settings(warn_only=True):
 		fab.run('killall -9 metamac');
 		#fab.run('~/metamac/bytecode-manager -l1 -m /root/metamac/wireless-mac-processor-aloha/mac-programs/metaMAC-program/dcf_v3-2.txt && ~/metamac/bytecode-manager -a 1')
 #		fab.run('~/metamac/bytecode-manager -l1 -m /root/metamac/wireless-mac-processor-aloha/mac-programs/metaMAC-program/aloha-slot-probability-always.txt && ~/metamac/bytecode-manager -a 1')
-    	fab.run('killall -9 metamac; nohup metamac/metamac {0} -l metamac.log metamac/wireless-mac-processor-*/mac-programs/metaMAC-program/{1} > metamac.out 2> metamac.err < /dev/null &'.format(arguments, suite), pty=False)
+#		fab.run('killall -9 metamac; nohup metamac/metamac {0} -l metamac.log metamac/wireless-mac-processor/mac-programs/metaMAC-program/{1} > metamac.out 2> metamac.err < /dev/null &'.format(arguments, suite), pty=False)
+		fab.run('killall -9 metamac; nohup metamac/metamac {0} metamac/wireless-mac-processor/mac-programs/metaMAC-program/{1} > metamac.out 2> metamac.err < /dev/null &'.format(arguments, suite), pty=False)
 
 @fab.task
 @fab.parallel
@@ -332,20 +415,28 @@ def stop_pkt_dump():
 
 @fab.task
 @fab.runs_once
-def run_trial(trialnum, suite, ap_node):
-    fab.execute(start_iperf_server, hosts=[ap_node])
+def run_trial(trialnum, suite, ap_node, eta):
+    #start iperf traffic server
+    #fab.execute(start_iperf_server, hosts=[ap_node])
+    
     fab.execute(kill_metamac)
-    fab.execute(start_metamac, suite, ap_node,0.25)
-    fab.execute(pkt_dump,trialnum)
-    src_rate_step=[10e3,190e3,200e3,400e3,6e6]
-    #src_rate_step=[100e3]
-    #src_rate_step=[6e6]
-    exp_duration=30*len(src_rate_step);
-    fab.execute(run_iperf_dyn_client, ap_node, exp_duration,src_rate_step, hosts=[h for h in fab.env.hosts if h.split('@')[-1] != ap_node])
-    fab.execute(stop_metamac, trialnum)
-    fab.execute(stop_iperf_server, trialnum, hosts=[ap_node])
-    fab.execute(stop_iperf)
-    fab.execute(stop_pkt_dump)
+    fab.execute(start_metamac, suite, ap_node, eta)
+    
+    #fab.execute(pkt_dump,trialnum)
+    
+    #src_rate_step=[10e3,190e3,200e3,400e3,6e6]
+    ##src_rate_step=[100e3]
+    ##src_rate_step=[6e6]
+    #exp_duration=30*len(src_rate_step);
+    #fab.execute(run_iperf_dyn_client, ap_node, exp_duration,src_rate_step, hosts=[h for h in fab.env.hosts if h.split('@')[-1] != ap_node])
+    #fab.local('sleep 120')
+    
+    #fab.execute(stop_metamac, trialnum)
+    
+    #fab.execute(stop_iperf_server, trialnum, hosts=[ap_node])
+    #fab.execute(stop_iperf)
+    
+    #fab.execute(stop_pkt_dump)
 
 @fab.task
 def sync_date():
