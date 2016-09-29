@@ -3,6 +3,7 @@ wmp-injection/bytecode-manager/metamac
 wmp-injection/bytecode-manager/tsfrecorder
 wmp-injection/bytecode-manager/slotrecorder
 experiments/*.pyc
+experiments/*/*.pyc
 experiments/data/
 *.o
 .idea

@@ -25,19 +25,19 @@ NETWORK
 fab -u root -H alix02,alix03,alix04,alix05,alix15 network:alix02
 
 METAMAC TDMA
-fab -u root -H alix02,alix03,alix04,alix05,alix15 run_trial:tdma-1,tdma-4.xml,alix02,0.25
+fab -u root -H alix02,alix03,alix04,alix05,alix15 run_trial:tdma-1,tdma-4.xml,alix02,0.25,10.8.8.10
 metamac/metamac -l metamac.log metamac/wireless-mac-processor/mac-programs/metaMAC-program/tdma-4.xml -g 10.8.8.6 -v -e 0.25
 metamac/metamac metamac/wireless-mac-processor/mac-programs/metaMAC-program/tdma-4.xml -g 10.8.8.6 -v -e 0.25
 fab -u root -H alix03,alix04,alix05,alix15 stop_metamac:tdma-1
 
 METAMAC ALOHA
-fab -u root -H alix02,alix03,alix04,alix05,alix15 run_trial:tdma-aloha,tdma-aloha_p04.xml,alix02,0.25
+fab -u root -H alix02,alix03,alix04,alix05,alix15 run_trial:tdma-aloha,tdma-aloha_p04.xml,alix02,0.25,10.8.8.10
 metamac/metamac -l metamac.log metamac/wireless-mac-processor/mac-programs/metaMAC-program/tdma-aloha_075.xml -g 10.8.8.6 -v -e 0.25
 metamac/metamac metamac/wireless-mac-processor/mac-programs/metaMAC-program/tdma-aloha_075.xml -g 10.8.8.6 -v -e 0.25
 fab -u root -H alix03,alix04,alix05,alix15 stop_metamac:tdma-aloha-1
 
 METAMAC ALOHA GOOD WORK
-fab -u root -H alix02,alix03,alix04,alix05,alix15 run_trial:tdma-aloha,tdma-4-wintech-09.xml,alix02,0.5
+fab -u root -H alix02,alix03,alix04,alix05,alix15 run_trial:tdma-aloha,tdma-4-wintech-09.xml,alix02,0.5,10.8.8.10
 metamac/metamac -v -g 10.8.8.6  metamac/wireless-mac-processor/mac-programs/metaMAC-program/tdma-4-wintech-09.xml -e 0.5
 metamac/metamac -v -g 10.8.8.10  metamac/wireless-mac-processor/mac-programs/metaMAC-program/tdma-4-wintech-09.xml -e 0.5
 fab -u root -H alix03,alix04,alix05,alix15 stop_metamac:tdma-aloha
@@ -351,7 +351,7 @@ def stop_iperf():
 
 @fab.task
 @fab.parallel
-def start_metamac(suite, ap_node=None, eta=0.0, cycle=False, remote_logging='10.8.8.6'):
+def start_metamac(suite, ap_node=None, eta=0.0, remote_logging='10.8.8.6', cycle=False,):
     if on_node(ap_node):
         suite = ap_ify(suite)
     arguments = ''
@@ -415,12 +415,12 @@ def stop_pkt_dump():
 
 @fab.task
 @fab.runs_once
-def run_trial(trialnum, suite, ap_node, eta):
+def run_trial(trialnum, suite, ap_node, eta, ip_gateway):
     #start iperf traffic server
     #fab.execute(start_iperf_server, hosts=[ap_node])
     
     fab.execute(kill_metamac)
-    fab.execute(start_metamac, suite, ap_node, eta)
+    fab.execute(start_metamac, suite, ap_node, eta, ip_gateway)
     
     #fab.execute(pkt_dump,trialnum)
     
